@@ -7,6 +7,17 @@ export interface TelegramCommand {
   chat_id: number;
 }
 
+export interface TelegramCallbackQuery {
+  callback_query_id: string;
+  chat_id: number;
+  data: string;
+}
+
+export interface TelegramTextMessage {
+  chat_id: number;
+  text: string;
+}
+
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const TELEGRAM_FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
@@ -143,5 +154,98 @@ export const telegramService = {
       const error = await response.text();
       throw new Error(`Nachricht senden fehlgeschlagen: ${error}`);
     }
+  },
+
+  /**
+   * Sendet eine Nachricht mit Inline-Buttons.
+   */
+  async sendMessageWithButtons(
+    chatId: number,
+    text: string,
+    buttons: Array<{ text: string; callback_data: string }>
+  ): Promise<void> {
+    const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text,
+        reply_markup: {
+          inline_keyboard: [buttons],
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Nachricht senden fehlgeschlagen: ${error}`);
+    }
+  },
+
+  /**
+   * Beantwortet eine Callback-Query (Button-Klick).
+   */
+  async answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void> {
+    await fetch(`${TELEGRAM_API}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        callback_query_id: callbackQueryId,
+        text: text,
+      }),
+    });
+  },
+
+  /**
+   * Extrahiert eine Callback-Query aus einem Telegram Update.
+   */
+  extractCallbackQuery(update: unknown): TelegramCallbackQuery | null {
+    const u = update as {
+      callback_query?: {
+        id?: string;
+        message?: { chat?: { id?: number } };
+        data?: string;
+      };
+    };
+
+    const cq = u?.callback_query;
+    if (!cq?.id || !cq?.data || !cq?.message?.chat?.id) {
+      return null;
+    }
+
+    return {
+      callback_query_id: cq.id,
+      chat_id: cq.message.chat.id,
+      data: cq.data,
+    };
+  },
+
+  /**
+   * Extrahiert eine Text-Nachricht (ohne Befehl) aus einem Telegram Update.
+   */
+  extractTextMessage(update: unknown): TelegramTextMessage | null {
+    const u = update as {
+      message?: {
+        chat?: { id?: number };
+        text?: string;
+        entities?: Array<{ type: string }>;
+      };
+    };
+
+    const message = u?.message;
+    if (!message?.text || !message?.chat?.id) {
+      return null;
+    }
+
+    // Ignoriere Bot-Befehle
+    const entities = message.entities || [];
+    if (entities.some(e => e.type === 'bot_command')) {
+      return null;
+    }
+
+    return {
+      chat_id: message.chat.id,
+      text: message.text,
+    };
   },
 };

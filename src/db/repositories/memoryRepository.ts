@@ -175,4 +175,32 @@ export const memoryRepository = {
 
     return stmt.all(weekStart) as MemoryEntry[];
   },
+
+  /**
+   * Findet den letzten Eintrag
+   */
+  findLast(): MemoryEntry | null {
+    const db = getDatabase();
+
+    const stmt = db.prepare(`
+      SELECT * FROM memory_entries
+      WHERE processing_status = 'summarized'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+
+    return (stmt.get() as MemoryEntry) || null;
+  },
+
+  /**
+   * Löscht einen Eintrag per ID
+   */
+  deleteById(id: number): boolean {
+    const db = getDatabase();
+
+    const stmt = db.prepare('DELETE FROM memory_entries WHERE id = ?');
+    const result = stmt.run(id);
+
+    return result.changes > 0;
+  },
 };

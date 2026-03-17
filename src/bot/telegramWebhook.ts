@@ -28,6 +28,29 @@ function formatEntry(entry: {
 }
 
 /**
+ * Verarbeitet den /delete oder "lösche letzte" Befehl.
+ */
+async function handleDelete(chatId: number): Promise<void> {
+  const lastEntry = memoryRepository.findLast();
+
+  if (!lastEntry) {
+    await telegramService.sendMessage(chatId, 'Keine Erinnerungen zum Löschen vorhanden.');
+    return;
+  }
+
+  const date = lastEntry.source_date;
+  const name = lastEntry.child_name || 'Kind';
+  const summary = lastEntry.cleaned_summary || '(keine Zusammenfassung)';
+
+  const text = `🗑️ Letzten Eintrag löschen?\n\n📅 ${date} | ${name}\n${summary}\n\nWirklich löschen?`;
+
+  await telegramService.sendMessageWithButtons(chatId, text, [
+    { text: '✅ Ja, löschen', callback_data: `delete_confirm_${lastEntry.id}` },
+    { text: '❌ Abbrechen', callback_data: 'delete_cancel' },
+  ]);
+}
+
+/**
  * Verarbeitet den /letzte Befehl.
  */
 async function handleLetzte(chatId: number): Promise<void> {
@@ -98,6 +121,42 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
 
     console.log('Telegram Update empfangen:', JSON.stringify(update, null, 2));
 
+    // Prüfe auf Callback-Query (Button-Klick)
+    const callbackQuery = telegramService.extractCallbackQuery(update);
+    if (callbackQuery) {
+      console.log('Callback Query erkannt:', callbackQuery.data);
+
+      if (callbackQuery.data.startsWith('delete_confirm_')) {
+        const entryId = parseInt(callbackQuery.data.replace('delete_confirm_', ''), 10);
+        const deleted = memoryRepository.deleteById(entryId);
+
+        await telegramService.answerCallbackQuery(callbackQuery.callback_query_id);
+
+        if (deleted) {
+          await telegramService.sendMessage(callbackQuery.chat_id, '✅ Erinnerung gelöscht.');
+        } else {
+          await telegramService.sendMessage(callbackQuery.chat_id, '❌ Eintrag nicht gefunden.');
+        }
+        return;
+      }
+
+      if (callbackQuery.data === 'delete_cancel') {
+        await telegramService.answerCallbackQuery(callbackQuery.callback_query_id);
+        await telegramService.sendMessage(callbackQuery.chat_id, '❌ Löschen abgebrochen.');
+        return;
+      }
+    }
+
+    // Prüfe auf Textnachrichten wie "lösche letzte"
+    const textMessage = telegramService.extractTextMessage(update);
+    if (textMessage) {
+      const lowerText = textMessage.text.toLowerCase().trim();
+      if (lowerText === 'lösche letzte' || lowerText === 'lösche letzten' || lowerText === 'letzten löschen') {
+        await handleDelete(textMessage.chat_id);
+        return;
+      }
+    }
+
     // Prüfe auf Befehle
     const command = telegramService.extractCommand(update);
     if (command) {
@@ -116,13 +175,17 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
             '👋 Hallo! Sende mir eine Sprachnachricht und ich speichere sie als Erinnerung.\n\n' +
             'Befehle:\n' +
             '/letzte - Zeigt die letzten 5 Erinnerungen\n' +
-            '/woche - Zeigt die Wochenzusammenfassung'
+            '/woche - Zeigt die Wochenzusammenfassung\n' +
+            '/delete - Löscht den letzten Eintrag'
           );
+          return;
+        case '/delete':
+          await handleDelete(command.chat_id);
           return;
         default:
           await telegramService.sendMessage(
             command.chat_id,
-            'Unbekannter Befehl. Nutze /letzte oder /woche'
+            'Unbekannter Befehl. Nutze /letzte, /woche oder /delete'
           );
           return;
       }
