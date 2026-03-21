@@ -1,6 +1,11 @@
 import 'dotenv/config';
 import { getDatabase, closeDatabase } from './client';
 import * as initialSchema from './migrations/001_initial_schema';
+import * as telegramUsers from './migrations/002_telegram_users';
+import * as addLocationFavorite from './migrations/003_add_location_favorite';
+import * as performanceIndexes from './migrations/004_add_performance_indexes';
+import * as addPeopleField from './migrations/005_add_people_field';
+import * as addCoordinates from './migrations/006_add_coordinates';
 
 /**
  * Führt alle ausstehenden Migrationen aus.
@@ -17,7 +22,14 @@ function runMigrations(): void {
     );
   `);
 
-  const migrations = [{ name: '001_initial_schema', migration: initialSchema }];
+  const migrations = [
+    { name: '001_initial_schema', migration: initialSchema },
+    { name: '002_telegram_users', migration: telegramUsers },
+    { name: '003_add_location_favorite', migration: addLocationFavorite },
+    { name: '004_add_performance_indexes', migration: performanceIndexes },
+    { name: '005_add_people_field', migration: addPeopleField },
+    { name: '006_add_coordinates', migration: addCoordinates },
+  ];
 
   for (const { name, migration } of migrations) {
     // Prüfe, ob Migration bereits angewendet wurde
