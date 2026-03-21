@@ -18,7 +18,7 @@ export const ALLOWED_CATEGORIES = [
 export type Category = (typeof ALLOWED_CATEGORIES)[number];
 
 // Quellentyp (vorbereitet für spätere Erweiterung)
-export type SourceType = 'voice' | 'photo' | 'text';
+export type SourceType = 'voice' | 'photo' | 'text' | 'web';
 
 // Status der Transkription
 export type TranscriptStatus = 'pending' | 'completed' | 'failed';
@@ -41,10 +41,16 @@ export interface MemoryEntry {
   cleaned_summary: string | null;
   categories: string | null; // JSON-Array als String
   tags: string | null; // JSON-Array als String
+  people: string | null; // JSON-Array als String - alle erwähnten Familienmitglieder
   importance_score: number | null;
   transcript_status: TranscriptStatus;
   processing_status: ProcessingStatus;
   error_message: string | null;
+  recorded_by: string | null; // Wer hat diese Erinnerung aufgenommen
+  location: string | null; // Ort der Erinnerung
+  is_favorite: number; // 0 oder 1
+  latitude: number | null;
+  longitude: number | null;
 }
 
 /**
@@ -59,6 +65,7 @@ export interface CreateMemoryEntry {
   raw_transcript?: string | null;
   transcript_status?: TranscriptStatus;
   processing_status?: ProcessingStatus;
+  recorded_by?: string | null;
 }
 
 /**
@@ -107,6 +114,7 @@ export interface SummarizationResult {
   cleaned_summary: string;
   categories: Category[];
   tags: string[];
+  people: string[]; // Alle erwähnten Familienmitglieder
   importance_score: number; // 1-5
 }
 
