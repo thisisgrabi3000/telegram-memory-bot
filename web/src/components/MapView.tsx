@@ -1,28 +1,23 @@
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import type { Memory } from '../types';
 
-// Fix default marker icon issue with webpack/vite
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-
-const DefaultIcon = L.icon({
-  iconUrl: icon,
-  shadowUrl: iconShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+// Fix default marker icon issue with Vite
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
-L.Marker.prototype.options.icon = DefaultIcon;
 
 interface MapViewProps {
   memories: Memory[];
 }
 
 export function MapView({ memories }: MapViewProps) {
-  // Filter memories with coordinates
+  // Filter memories with valid coordinates
   const memoriesWithCoords = memories.filter(
-    (m) => m.latitude !== null && m.longitude !== null
+    (m) => typeof m.latitude === 'number' && typeof m.longitude === 'number'
   );
 
   // Default center (Germany)
@@ -55,37 +50,35 @@ export function MapView({ memories }: MapViewProps) {
     <MapContainer
       center={center}
       zoom={6}
-      style={{ height: 'calc(100vh - 180px)', width: '100%', borderRadius: '1rem' }}
+      style={{ height: '70vh', minHeight: '400px', width: '100%', borderRadius: '1rem' }}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <MarkerClusterGroup chunkedLoading>
-        {memoriesWithCoords.map((memory) => (
-          <Marker
-            key={memory.id}
-            position={[memory.latitude!, memory.longitude!]}
-          >
-            <Popup>
-              <div className="text-sm" style={{ minWidth: '200px' }}>
-                <p className="font-semibold mb-1">
-                  {memory.source_date}
-                  {memory.child_name && ` - ${memory.child_name}`}
+      {memoriesWithCoords.map((memory) => (
+        <Marker
+          key={memory.id}
+          position={[memory.latitude!, memory.longitude!]}
+        >
+          <Popup>
+            <div className="text-sm" style={{ minWidth: '200px' }}>
+              <p className="font-semibold mb-1">
+                {memory.source_date}
+                {memory.child_name && ` - ${memory.child_name}`}
+              </p>
+              <p className="text-gray-600">
+                {memory.cleaned_summary || '(Keine Beschreibung)'}
+              </p>
+              {memory.location && (
+                <p className="text-xs text-gray-400 mt-1">
+                  {memory.location}
                 </p>
-                <p className="text-gray-600">
-                  {memory.cleaned_summary || '(Keine Beschreibung)'}
-                </p>
-                {memory.location && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    {memory.location}
-                  </p>
-                )}
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MarkerClusterGroup>
+              )}
+            </div>
+          </Popup>
+        </Marker>
+      ))}
     </MapContainer>
   );
 }

@@ -1159,7 +1159,9 @@ export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onC
           )}
         </section>
         </>) : (
-          <MapView memories={filteredMemories} />
+          <div className="w-full" style={{ minHeight: 'calc(100vh - 200px)' }}>
+            <MapView memories={filteredMemories} />
+          </div>
         )}
       </main>
 
