@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { env } from '../config/env';
 
 let db: Database.Database | null = null;
 
@@ -13,7 +14,7 @@ export function getDatabase(): Database.Database {
     return db;
   }
 
-  const dbPath = process.env.DATABASE_PATH || './data/memory.db';
+  const dbPath = env.DATABASE_PATH;
   const absolutePath = path.resolve(dbPath);
 
   // Stelle sicher, dass das Verzeichnis existiert

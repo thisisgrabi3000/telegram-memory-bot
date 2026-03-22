@@ -1,0 +1,76 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        warm: {
+          50: '#fdf8f3',
+          100: '#faeee0',
+          200: '#f5dcc1',
+          300: '#edc59a',
+          400: '#e3a76e',
+          500: '#d98f4c',
+          600: '#cb7941',
+          700: '#a85e37',
+          800: '#874d33',
+          900: '#6d412c',
+        },
+        sand: {
+          50: '#faf9f6',
+          100: '#f3f1eb',
+          200: '#e6e2d5',
+          300: '#d5cdb8',
+          400: '#c0b494',
+          500: '#b0a078',
+          600: '#a38d64',
+          700: '#877353',
+          800: '#6f5f47',
+          900: '#5c4f3d',
+        },
+        sage: {
+          50: '#f6f7f5',
+          100: '#e9ece6',
+          200: '#d4dacf',
+          300: '#b5c0ae',
+          400: '#94a38a',
+          500: '#78896d',
+          600: '#5f6e57',
+          700: '#4c5946',
+          800: '#3f493a',
+          900: '#363e32',
+        },
+        coral: {
+          50: '#fef5f3',
+          100: '#fde8e3',
+          200: '#fdd5cc',
+          300: '#fab7a7',
+          400: '#f58e75',
+          500: '#ec6b4c',
+          600: '#d94f2e',
+          700: '#b63f24',
+          800: '#963721',
+          900: '#7c3222',
+        },
+      },
+      fontFamily: {
+        display: ['Playfair Display', 'Georgia', 'serif'],
+        body: ['Nunito', 'system-ui', 'sans-serif'],
+      },
+      boxShadow: {
+        'soft': '0 4px 20px -2px rgba(139, 90, 43, 0.08)',
+        'soft-lg': '0 10px 40px -4px rgba(139, 90, 43, 0.12)',
+        'warm': '0 4px 14px -2px rgba(217, 143, 76, 0.15)',
+      },
+      borderRadius: {
+        'xl': '1rem',
+        '2xl': '1.5rem',
+        '3xl': '2rem',
+      },
+    },
+  },
+  plugins: [],
+}

@@ -3,6 +3,7 @@ import path from 'path';
 import OpenAI from 'openai';
 import { ALLOWED_CATEGORIES, type SummarizationResult, type Category } from '../types';
 import { getChildrenInfo, resolveChildName } from '../config/children';
+import { env } from '../config/env';
 
 /**
  * Lädt einen Prompt aus einer Markdown-Datei.
@@ -10,6 +11,21 @@ import { getChildrenInfo, resolveChildName } from '../config/children';
 function loadPrompt(filename: string): string {
   const promptPath = path.join(__dirname, '..', 'prompts', filename);
   return fs.readFileSync(promptPath, 'utf-8');
+}
+
+/**
+ * Sicheres JSON-Parsing mit Fehlerbehandlung.
+ */
+function safeJsonParse<T = unknown>(jsonString: string, context: string): T {
+  try {
+    return JSON.parse(jsonString) as T;
+  } catch (error) {
+    const preview = jsonString.slice(0, 200);
+    throw new Error(
+      `JSON-Parsing fehlgeschlagen (${context}): ${error instanceof Error ? error.message : 'Unbekannter Fehler'}. ` +
+      `Input: "${preview}${jsonString.length > 200 ? '...' : ''}"`
+    );
+  }
 }
 
 /**
@@ -38,6 +54,23 @@ function validateResult(raw: unknown): SummarizationResult {
     }
   }
 
+  // Validiere People (alle erwähnten Familienmitglieder)
+  const people: string[] = [];
+  if (Array.isArray(data.people)) {
+    for (const person of data.people) {
+      if (typeof person === 'string') {
+        // Versuche den Namen zu normalisieren
+        const resolved = resolveChildName(person);
+        if (resolved && !people.includes(resolved)) {
+          people.push(resolved);
+        } else if (!resolved && !people.includes(person)) {
+          // Falls nicht auflösbar, behalte Originalname
+          people.push(person);
+        }
+      }
+    }
+  }
+
   // Validiere importance_score (1-5)
   let importance = 3;
   if (typeof data.importance_score === 'number') {
@@ -53,6 +86,7 @@ function validateResult(raw: unknown): SummarizationResult {
     cleaned_summary: typeof data.cleaned_summary === 'string' ? data.cleaned_summary : '',
     categories: categories.length > 0 ? categories : ['Besonderes'],
     tags: tags.slice(0, 5),
+    people,
     importance_score: importance,
   };
 }
@@ -66,7 +100,7 @@ export const summarizationService = {
    */
   async summarize(rawTranscript: string): Promise<SummarizationResult> {
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: env.OPENAI_API_KEY,
     });
 
     const promptTemplate = loadPrompt('summarizeMemory.prompt.md');
@@ -93,7 +127,7 @@ export const summarizationService = {
       throw new Error('Keine JSON-Antwort vom LLM');
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = safeJsonParse(jsonMatch[0], 'summarize');
     return validateResult(parsed);
   },
 
@@ -108,7 +142,7 @@ export const summarizationService = {
     weekly_summary: string;
   }> {
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: env.OPENAI_API_KEY,
     });
 
     const promptTemplate = loadPrompt('weeklySummary.prompt.md');
@@ -135,11 +169,11 @@ export const summarizationService = {
       throw new Error('Keine JSON-Antwort vom LLM');
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = safeJsonParse<Record<string, unknown>>(jsonMatch[0], 'weeklySummary');
 
     return {
-      highlights: Array.isArray(parsed.highlights) ? parsed.highlights : [],
-      themes: Array.isArray(parsed.themes) ? parsed.themes : [],
+      highlights: Array.isArray(parsed.highlights) ? parsed.highlights as string[] : [],
+      themes: Array.isArray(parsed.themes) ? parsed.themes as string[] : [],
       weekly_summary: typeof parsed.weekly_summary === 'string' ? parsed.weekly_summary : '',
     };
   },

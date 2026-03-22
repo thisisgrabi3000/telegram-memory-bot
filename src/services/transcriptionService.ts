@@ -1,6 +1,7 @@
 import fs from 'fs';
 import OpenAI from 'openai';
 import type { TranscriptionResult } from '../types';
+import { env } from '../config/env';
 
 /**
  * Provider-Schnittstelle für Transkription.
@@ -19,7 +20,7 @@ export const openAIProvider: TranscriptionProvider = {
 
   async transcribe(audioFilePath: string): Promise<TranscriptionResult> {
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: env.OPENAI_API_KEY,
     });
 
     try {
@@ -47,6 +48,42 @@ export const openAIProvider: TranscriptionProvider = {
     }
   },
 };
+
+/**
+ * Detaillierte Transkription mit Füllwörtern, Lachen, Pausen etc.
+ */
+export async function transcribeDetailed(audioFilePath: string): Promise<TranscriptionResult> {
+  const openai = new OpenAI({
+    apiKey: env.OPENAI_API_KEY,
+  });
+
+  try {
+    const audioFile = fs.createReadStream(audioFilePath);
+
+    // Whisper mit Prompt für detaillierte Transkription
+    const response = await openai.audio.transcriptions.create({
+      file: audioFile,
+      model: 'whisper-1',
+      language: 'de',
+      prompt: 'Transkribiere wortgetreu mit allen Füllwörtern (ähm, äh, also, und, hmm). ' +
+        'Notiere Lachen als [lacht], Pausen als [...], Kinderaussprache exakt wie gesprochen. ' +
+        'Beispiel: "Und dann hat der Junis gesagt ähm... [lacht] Papa guck mal!"',
+    });
+
+    return {
+      success: true,
+      transcript: response.text,
+      provider: 'openai-whisper-detailed',
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unbekannter Fehler';
+    return {
+      success: false,
+      provider: 'openai-whisper-detailed',
+      error: message,
+    };
+  }
+}
 
 /**
  * Transkriptions-Service mit austauschbarem Provider.
