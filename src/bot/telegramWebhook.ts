@@ -29,9 +29,14 @@ const pendingTranscriptions = new Map<number, PendingTranscription>();
 
 /**
  * Stored locations per chat (from Telegram location sharing).
- * Key: chat_id, Value: location name
+ * Key: chat_id, Value: location data with name and coordinates
  */
-const chatLocations = new Map<number, string>();
+interface StoredLocation {
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+const chatLocations = new Map<number, StoredLocation>();
 
 /**
  * Verarbeitet und speichert eine Transkription mit Zusammenfassung.
@@ -55,9 +60,10 @@ async function processAndSaveTranscription(params: {
     memoryRepository.updateSummary(entryId, summary);
 
     // Auto-apply location if available
-    const location = chatLocations.get(chatId) || null;
-    if (location) {
-      memoryRepository.updateLocation(entryId, location);
+    const storedLoc = chatLocations.get(chatId);
+    if (storedLoc) {
+      memoryRepository.updateLocation(entryId, storedLoc.name);
+      memoryRepository.updateCoordinates(entryId, storedLoc.latitude, storedLoc.longitude);
     }
 
     // Ermittle erwähnte Personen
@@ -587,7 +593,11 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
 
         if (locationName) {
           // Store location for this chat (will be used for next memory)
-          chatLocations.set(locationMessage.chat_id, locationName);
+          chatLocations.set(locationMessage.chat_id, {
+            name: locationName,
+            latitude: locationMessage.latitude,
+            longitude: locationMessage.longitude,
+          });
 
           // Also update the most recent memory if within last 10 minutes
           const lastEntry = memoryRepository.findLast();
@@ -619,10 +629,10 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
       return;
     }
 
-    // Prüfe auf Foto
-    const photoMessage = telegramService.extractPhotoMessage(update);
+    // Prüfe auf Foto oder Bild-Datei (Document)
+    const photoMessage = telegramService.extractPhotoMessage(update) || telegramService.extractDocumentMessage(update);
     if (photoMessage) {
-      console.log('Foto empfangen:', photoMessage);
+      console.log('Foto/Bild empfangen:', photoMessage);
 
       // Hole registrierten Nutzer
       const photoUser = userRepository.findByChatId(photoMessage.chat_id);
@@ -704,14 +714,17 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
           });
 
           // Setze Ort aus EXIF oder gespeichertem Chat-Ort
-          const finalLocation = exifLocation || chatLocations.get(photoMessage.chat_id) || null;
+          const storedLocation = chatLocations.get(photoMessage.chat_id);
+          const finalLocation = exifLocation || storedLocation?.name || null;
           if (finalLocation) {
             memoryRepository.updateLocation(entry.id, finalLocation);
           }
 
-          // Speichere EXIF-GPS-Koordinaten
+          // Speichere GPS-Koordinaten (EXIF oder gespeicherter Standort)
           if (exifCoords) {
             memoryRepository.updateCoordinates(entry.id, exifCoords.latitude, exifCoords.longitude);
+          } else if (storedLocation) {
+            memoryRepository.updateCoordinates(entry.id, storedLocation.latitude, storedLocation.longitude);
           }
 
           // Speichere Medienanhang

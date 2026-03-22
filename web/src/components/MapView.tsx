@@ -62,14 +62,35 @@ export function MapView({ memories }: MapViewProps) {
           position={[memory.latitude!, memory.longitude!]}
         >
           <Popup>
-            <div className="text-sm" style={{ minWidth: '200px' }}>
+            <div className="text-sm" style={{ minWidth: '200px', maxWidth: '280px' }}>
+              {memory.photos && memory.photos.length > 0 && (
+                <img
+                  src={memory.photos[0].url}
+                  alt=""
+                  style={{
+                    width: '100%',
+                    height: '120px',
+                    objectFit: 'cover',
+                    borderRadius: '8px',
+                    marginBottom: '8px',
+                  }}
+                />
+              )}
               <p className="font-semibold mb-1">
                 {memory.source_date}
                 {memory.child_name && ` - ${memory.child_name}`}
               </p>
-              <p className="text-gray-600">
-                {memory.cleaned_summary || '(Keine Beschreibung)'}
-              </p>
+              {memory.cleaned_summary && (
+                <p className="text-gray-600" style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                }}>
+                  {memory.cleaned_summary}
+                </p>
+              )}
               {memory.location && (
                 <p className="text-xs text-gray-400 mt-1">
                   {memory.location}
