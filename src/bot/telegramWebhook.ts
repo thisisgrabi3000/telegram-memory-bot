@@ -71,7 +71,7 @@ async function processAndSaveTranscription(params: {
 
     const confirmation = formatConfirmation(
       summary.child_name,
-      location,
+      storedLoc?.name ?? null,
       speakerInfo.author?.name,
       mentionedNames
     );
@@ -215,7 +215,7 @@ function formatEntry(entry: {
  * Verarbeitet den /delete oder "lösche letzte" Befehl.
  */
 async function handleDelete(chatId: number): Promise<void> {
-  const lastEntry = memoryRepository.findLast();
+  const lastEntry = memoryRepository.findLast(chatId);
 
   if (!lastEntry) {
     await telegramService.sendMessage(chatId, 'Keine Erinnerungen zum Löschen vorhanden.');
@@ -600,7 +600,7 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
           });
 
           // Also update the most recent memory if within last 10 minutes
-          const lastEntry = memoryRepository.findLast();
+          const lastEntry = memoryRepository.findLast(locationMessage.chat_id);
           const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
 
           if (lastEntry && new Date(lastEntry.created_at).getTime() > tenMinutesAgo && !lastEntry.location) {
@@ -630,9 +630,10 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
     }
 
     // Prüfe auf Foto oder Bild-Datei (Document)
+    const isCompressedPhoto = !!telegramService.extractPhotoMessage(update);
     const photoMessage = telegramService.extractPhotoMessage(update) || telegramService.extractDocumentMessage(update);
     if (photoMessage) {
-      console.log('Foto/Bild empfangen:', photoMessage);
+      console.log('Foto/Bild empfangen:', photoMessage, isCompressedPhoto ? '(komprimiert)' : '(als Datei)');
 
       // Hole registrierten Nutzer
       const photoUser = userRepository.findByChatId(photoMessage.chat_id);
@@ -670,7 +671,7 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
         }
 
         // Finde den letzten Eintrag (innerhalb der letzten 5 Minuten)
-        const lastEntry = memoryRepository.findLast();
+        const lastEntry = memoryRepository.findLast(photoMessage.chat_id);
         const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
 
         if (lastEntry && new Date(lastEntry.created_at).getTime() > fiveMinutesAgo) {
@@ -785,6 +786,13 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
               `📷 Foto gespeichert!${exifText}`
             );
           }
+        }
+        // Hinweis: Komprimierte Fotos verlieren EXIF-Daten
+        if (isCompressedPhoto && !exifCoords) {
+          await telegramService.sendMessage(
+            photoMessage.chat_id,
+            '💡 Tipp: Sende Fotos als Datei (Büroklammer > Datei), um GPS-Daten und Aufnahmedatum zu behalten.'
+          );
         }
       } catch (error) {
         console.error('Fehler beim Foto-Upload:', error);
