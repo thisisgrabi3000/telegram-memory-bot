@@ -179,14 +179,23 @@ export const memoryRepository = {
   },
 
   /**
-   * Findet den letzten Eintrag
+   * Findet den letzten Eintrag, optional gefiltert nach Chat-ID.
    */
-  findLast(): MemoryEntry | null {
+  findLast(chatId?: number): MemoryEntry | null {
     const db = getDatabase();
+
+    if (chatId !== undefined) {
+      const stmt = db.prepare(`
+        SELECT * FROM memory_entries
+        WHERE telegram_chat_id = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
+      return (stmt.get(chatId) as MemoryEntry) || null;
+    }
 
     const stmt = db.prepare(`
       SELECT * FROM memory_entries
-      WHERE processing_status = 'summarized'
       ORDER BY created_at DESC
       LIMIT 1
     `);
