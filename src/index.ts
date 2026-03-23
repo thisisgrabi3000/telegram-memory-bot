@@ -70,6 +70,16 @@ app.use('/api/auth', authApi);
 // Telegram Webhook unter /webhook/telegram
 app.use('/webhook', telegramWebhook);
 
+// React Frontend aus web/dist servieren
+const webDistPath = path.resolve('./web/dist');
+if (fs.existsSync(webDistPath)) {
+  app.use(express.static(webDistPath));
+  // SPA-Fallback: alle nicht-API-Routen an index.html weiterleiten
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(webDistPath, 'index.html'));
+  });
+}
+
 // Server starten
 const server = app.listen(PORT, async () => {
   // Datenbankverbindung testen

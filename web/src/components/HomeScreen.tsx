@@ -17,7 +17,7 @@ interface HomeScreenProps {
   onUpdate?: (id: number, text: string) => Promise<void>;
   onDelete?: (id: number) => Promise<void>;
   onToggleFavorite?: (id: number) => Promise<void>;
-  onCreate?: (data: { text: string; child_name?: string; location?: string; source_date?: string }) => Promise<void>;
+  onCreate?: (data: { text: string; child_name?: string; location?: string; source_date?: string; people?: string[]; photos?: File[] }) => Promise<void>;
 }
 
 type TimeFilter = '24h' | '7d' | '30d' | 'year' | 'custom';

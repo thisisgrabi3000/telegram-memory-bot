@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HomeScreen, LoginScreen } from './components';
-import { fetchMemories, updateMemory, deleteMemory, toggleFavorite, createMemory } from './api/memoriesApi';
+import { fetchMemories, updateMemory, deleteMemory, toggleFavorite, createMemory, uploadPhotos } from './api/memoriesApi';
 import type { Memory } from './types';
 import { Loader2, Heart, RefreshCw, AlertTriangle } from 'lucide-react';
 
@@ -149,8 +149,14 @@ function App() {
     setMemories(prev => prev.map(m => m.id === id ? updated : m));
   }
 
-  async function handleCreate(data: { text: string; child_name?: string; location?: string; source_date?: string }) {
-    const created = await createMemory(data);
+  async function handleCreate(data: { text: string; child_name?: string; location?: string; source_date?: string; people?: string[]; photos?: File[] }) {
+    const { photos, ...memoryData } = data;
+    let created = await createMemory(memoryData);
+
+    if (photos && photos.length > 0) {
+      created = await uploadPhotos(created.id, photos);
+    }
+
     setMemories(prev => [created, ...prev]);
   }
 

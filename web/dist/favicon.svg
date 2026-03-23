@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e86b3f"/>
+      <stop offset="50%" style="stop-color:#d54f25"/>
+      <stop offset="100%" style="stop-color:#c05a3d"/>
+    </linearGradient>
+    <linearGradient id="shineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:white;stop-opacity:0.25"/>
+      <stop offset="50%" style="stop-color:white;stop-opacity:0"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect x="4" y="4" width="92" height="92" rx="22" ry="22" fill="url(#bgGradient)"/>
+  <!-- Shine effect -->
+  <rect x="4" y="4" width="92" height="46" rx="22" ry="22" fill="url(#shineGradient)"/>
+  <!-- Heart -->
+  <path d="M50 78 C25 58 15 42 15 32 C15 20 25 12 37 12 C45 12 50 18 50 18 C50 18 55 12 63 12 C75 12 85 20 85 32 C85 42 75 58 50 78 Z" fill="white" opacity="0.95"/>
+  <!-- Sparkle -->
+  <circle cx="74" cy="26" r="5" fill="white" opacity="0.5"/>
+  <circle cx="80" cy="20" r="2.5" fill="white" opacity="0.35"/>
+</svg>

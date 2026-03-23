@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { X, User, MapPin, Calendar, Loader2, Sparkles, PenLine, Check } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { X, User, MapPin, Calendar, Loader2, Sparkles, PenLine, Check, Camera, ImagePlus } from 'lucide-react';
 import { FAMILY_MEMBERS, LOCATIONS } from '../types';
+
+const CHILDREN = ['Junis', 'Noah'];
 
 interface CreateMemoryModalProps {
   onClose: () => void;
@@ -9,17 +11,66 @@ interface CreateMemoryModalProps {
     child_name?: string;
     location?: string;
     source_date?: string;
+    people?: string[];
+    photos?: File[];
   }) => Promise<void>;
 }
 
 export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps) {
   const [text, setText] = useState('');
-  const [childName, setChildName] = useState('');
-  const [location, setLocation] = useState('');
+  const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
+  const [presetLocation, setPresetLocation] = useState('');
+  const [customLocation, setCustomLocation] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [textFocused, setTextFocused] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const location = customLocation.trim() || presetLocation;
+
+  function togglePerson(name: string) {
+    setSelectedPeople(prev =>
+      prev.includes(name) ? prev.filter(p => p !== name) : [...prev, name]
+    );
+  }
+
+  function selectPresetLocation(name: string) {
+    setPresetLocation(name === presetLocation ? '' : name);
+    setCustomLocation('');
+  }
+
+  function handleCustomLocationChange(val: string) {
+    setCustomLocation(val);
+    setPresetLocation('');
+  }
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const newPhotos = [...photos, ...files].slice(0, 10);
+    setPhotos(newPhotos);
+
+    // Generate previews
+    const newPreviews = [...photoPreviews];
+    files.slice(0, 10 - photoPreviews.length).forEach(file => {
+      const url = URL.createObjectURL(file);
+      newPreviews.push(url);
+    });
+    setPhotoPreviews(newPreviews.slice(0, 10));
+
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  }
+
+  function removePhoto(index: number) {
+    URL.revokeObjectURL(photoPreviews[index]);
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,13 +83,20 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
     setIsSubmitting(true);
     setError(null);
 
+    // Derive child_name from selected children
+    const child_name = selectedPeople.find(p => CHILDREN.includes(p)) || undefined;
+
     try {
       await onCreate({
         text: text.trim(),
-        child_name: childName || undefined,
+        child_name,
         location: location || undefined,
         source_date: date || undefined,
+        people: selectedPeople.length > 0 ? selectedPeople : undefined,
+        photos: photos.length > 0 ? photos : undefined,
       });
+      // Cleanup previews
+      photoPreviews.forEach(url => URL.revokeObjectURL(url));
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Speichern');
@@ -57,17 +115,19 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
         style={{
           backgroundColor: 'var(--color-bg-primary)',
           boxShadow: 'var(--shadow-2xl)',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
-          className="relative px-6 py-5 flex items-center justify-between overflow-hidden"
+          className="relative px-6 py-5 flex items-center justify-between overflow-hidden flex-shrink-0"
           style={{
             background: 'linear-gradient(135deg, var(--color-terracotta-500) 0%, var(--color-terracotta-600) 50%, var(--color-rust-600) 100%)',
           }}
         >
-          {/* Decorative elements */}
           <div
             className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-20"
             style={{
@@ -103,8 +163,12 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        {/* Scrollable form body */}
+        <form
+          onSubmit={handleSubmit}
+          className="p-6 space-y-6 overflow-y-auto"
+          style={{ flex: 1 }}
+        >
           {/* Text Input */}
           <div>
             <label
@@ -135,7 +199,6 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
                 autoFocus
                 disabled={isSubmitting}
               />
-              {/* Character count hint */}
               <div
                 className="absolute bottom-3 right-3 text-xs"
                 style={{ color: 'var(--color-text-light)' }}
@@ -145,52 +208,89 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
             </div>
           </div>
 
-          {/* Child Selection */}
+          {/* Photo Upload */}
+          <div>
+            <label
+              className="flex items-center gap-2 text-sm font-bold mb-3"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              <Camera className="w-4 h-4" style={{ color: 'var(--color-terracotta-500)' }} />
+              Fotos
+            </label>
+
+            {/* Photo previews */}
+            {photoPreviews.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {photoPreviews.map((url, i) => (
+                  <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden group">
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(i)}
+                      className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              ref={fileInputRef}
+              onChange={handlePhotoChange}
+              className="hidden"
+              disabled={isSubmitting}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isSubmitting || photos.length >= 10}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed text-sm font-semibold transition-all duration-200 hover:border-terracotta-400"
+              style={{
+                borderColor: 'var(--color-sand-300)',
+                color: 'var(--color-text-muted)',
+                backgroundColor: 'white',
+              }}
+            >
+              <ImagePlus className="w-4 h-4" />
+              {photos.length === 0 ? 'Fotos hinzufügen' : `${photos.length} Foto${photos.length > 1 ? 's' : ''} gewählt`}
+            </button>
+          </div>
+
+          {/* Person Selection — multi-select */}
           <div>
             <label
               className="flex items-center gap-2 text-sm font-bold mb-3"
               style={{ color: 'var(--color-text-primary)' }}
             >
               <User className="w-4 h-4" style={{ color: 'var(--color-terracotta-500)' }} />
-              Person
+              Personen
             </label>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setChildName('')}
-                className={`px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 hover:scale-105 ${
-                  !childName ? 'ring-2 ring-offset-2' : ''
-                }`}
-                style={{
-                  backgroundColor: !childName ? 'var(--color-terracotta-500)' : 'white',
-                  color: !childName ? 'white' : 'var(--color-text-muted)',
-                  border: !childName ? 'none' : '2px solid var(--color-sand-200)',
-                  boxShadow: !childName ? 'var(--shadow-glow-terracotta), 0 0 0 2px var(--color-terracotta-400), 0 0 0 4px white' : 'none',
-                }}
-              >
-                Keine Auswahl
-              </button>
-              {FAMILY_MEMBERS.map((member) => (
-                <button
-                  key={member.name}
-                  type="button"
-                  onClick={() => setChildName(member.name)}
-                  className={`px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 hover:scale-105 relative overflow-hidden ${
-                    childName === member.name ? 'ring-2 ring-offset-2' : ''
-                  }`}
-                  style={{
-                    backgroundColor: childName === member.name ? member.color.activeBg : 'white',
-                    color: childName === member.name ? 'white' : member.color.text,
-                    border: childName === member.name ? 'none' : '2px solid var(--color-sand-200)',
-                    boxShadow: childName === member.name ? `0 4px 12px ${member.color.activeBg}40, 0 0 0 2px ${member.color.activeBg}, 0 0 0 4px white` : 'none',
-                  }}
-                >
-                  {childName === member.name && (
-                    <span className="absolute inset-0 bg-gradient-to-t from-black/10 to-white/10" />
-                  )}
-                  <span className="relative">{member.name}</span>
-                </button>
-              ))}
+              {FAMILY_MEMBERS.map((member) => {
+                const active = selectedPeople.includes(member.name);
+                return (
+                  <button
+                    key={member.name}
+                    type="button"
+                    onClick={() => togglePerson(member.name)}
+                    className="px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-105 relative overflow-hidden"
+                    style={{
+                      backgroundColor: active ? member.color.activeBg : 'white',
+                      color: active ? 'white' : member.color.text,
+                      border: active ? 'none' : '2px solid var(--color-sand-200)',
+                      boxShadow: active ? `0 4px 12px ${member.color.activeBg}40, 0 0 0 2px ${member.color.activeBg}, 0 0 0 4px white` : 'none',
+                    }}
+                  >
+                    {active && <span className="absolute inset-0 bg-gradient-to-t from-black/10 to-white/10" />}
+                    <span className="relative">{member.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -203,41 +303,53 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
               <MapPin className="w-4 h-4" style={{ color: 'var(--color-sage-500)' }} />
               Ort
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mb-3">
               <button
                 type="button"
-                onClick={() => setLocation('')}
-                className={`px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 hover:scale-105 ${
-                  !location ? 'ring-2 ring-offset-2' : ''
-                }`}
+                onClick={() => selectPresetLocation('')}
+                className="px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-105"
                 style={{
-                  backgroundColor: !location ? 'var(--color-sage-500)' : 'white',
-                  color: !location ? 'white' : 'var(--color-text-muted)',
-                  border: !location ? 'none' : '2px solid var(--color-sand-200)',
-                  boxShadow: !location ? '0 4px 12px rgba(117,143,90,0.25), 0 0 0 2px var(--color-sage-400), 0 0 0 4px white' : 'none',
+                  backgroundColor: !presetLocation && !customLocation ? 'var(--color-sage-500)' : 'white',
+                  color: !presetLocation && !customLocation ? 'white' : 'var(--color-text-muted)',
+                  border: !presetLocation && !customLocation ? 'none' : '2px solid var(--color-sand-200)',
+                  boxShadow: !presetLocation && !customLocation ? '0 4px 12px rgba(117,143,90,0.25), 0 0 0 2px var(--color-sage-400), 0 0 0 4px white' : 'none',
                 }}
               >
                 Kein Ort
               </button>
-              {LOCATIONS.map((loc) => (
-                <button
-                  key={loc.name}
-                  type="button"
-                  onClick={() => setLocation(loc.name)}
-                  className={`px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 hover:scale-105 ${
-                    location === loc.name ? 'ring-2 ring-offset-2' : ''
-                  }`}
-                  style={{
-                    backgroundColor: location === loc.name ? 'var(--color-sand-600)' : 'white',
-                    color: location === loc.name ? 'white' : 'var(--color-text-muted)',
-                    border: location === loc.name ? 'none' : '2px solid var(--color-sand-200)',
-                    boxShadow: location === loc.name ? '0 4px 12px rgba(146,122,94,0.25), 0 0 0 2px var(--color-sand-500), 0 0 0 4px white' : 'none',
-                  }}
-                >
-                  {loc.emoji} {loc.name}
-                </button>
-              ))}
+              {LOCATIONS.map((loc) => {
+                const active = presetLocation === loc.name;
+                return (
+                  <button
+                    key={loc.name}
+                    type="button"
+                    onClick={() => selectPresetLocation(loc.name)}
+                    className="px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-105"
+                    style={{
+                      backgroundColor: active ? 'var(--color-sand-600)' : 'white',
+                      color: active ? 'white' : 'var(--color-text-muted)',
+                      border: active ? 'none' : '2px solid var(--color-sand-200)',
+                      boxShadow: active ? '0 4px 12px rgba(146,122,94,0.25), 0 0 0 2px var(--color-sand-500), 0 0 0 4px white' : 'none',
+                    }}
+                  >
+                    {loc.emoji} {loc.name}
+                  </button>
+                );
+              })}
             </div>
+            <input
+              type="text"
+              value={customLocation}
+              onChange={(e) => handleCustomLocationChange(e.target.value)}
+              placeholder="Anderen Ort eingeben..."
+              className="w-full px-4 py-2.5 rounded-xl border-2 focus:outline-none transition-all duration-200 text-sm"
+              style={{
+                backgroundColor: 'white',
+                borderColor: customLocation ? 'var(--color-sage-400)' : 'var(--color-sand-200)',
+                color: 'var(--color-text-primary)',
+              }}
+              disabled={isSubmitting}
+            />
           </div>
 
           {/* Date */}
