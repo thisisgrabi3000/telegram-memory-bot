@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { format, parseISO, subDays, subHours, startOfYear, isWithinInterval } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
@@ -1165,73 +1166,110 @@ export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onC
         )}
       </main>
 
-      {/* Lightbox */}
-      {lightboxImage && (
+      {/* Lightbox – via Portal to avoid stacking context clipping */}
+      {lightboxImage && createPortal(
         <div
-          className="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(42, 33, 24, 0.88)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+            gap: '1rem',
+          }}
           onClick={() => setLightboxImage(null)}
         >
+          {/* Close button */}
           <button
-            className="absolute top-6 right-6 p-3 rounded-2xl transition-all duration-300 hover:scale-110"
             style={{
+              position: 'absolute',
+              top: '1.5rem',
+              right: '1.5rem',
+              padding: '0.75rem',
+              borderRadius: '1rem',
               backgroundColor: 'rgba(255,255,255,0.95)',
-              color: 'var(--color-text-primary)',
-              boxShadow: 'var(--shadow-lg)',
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
             onClick={() => setLightboxImage(null)}
           >
-            <X className="w-6 h-6" />
+            <X className="w-6 h-6" style={{ color: '#1a1a1a' }} />
           </button>
 
+          {/* Image – natural aspect ratio, constrained to viewport */}
+          <img
+            src={lightboxImage.url}
+            alt=""
+            style={{
+              maxWidth: 'calc(100vw - 2rem)',
+              maxHeight: 'calc(100vh - 160px)',
+              width: 'auto',
+              height: 'auto',
+              borderRadius: '1.5rem',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
+              display: 'block',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {/* Info panel */}
           <div
-            className="max-w-4xl w-full animate-fade-in-scale"
+            style={{
+              width: 'min(100%, 600px)',
+              background: 'rgba(255,255,255,0.12)',
+              borderRadius: '1rem',
+              padding: '1rem 1.25rem',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.2)',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Image */}
-            <img
-              src={lightboxImage.url}
-              alt=""
-              className="w-full rounded-3xl mb-5"
-              style={{ boxShadow: 'var(--shadow-2xl)' }}
-            />
-
-            {/* Info */}
-            <div className="glass-card p-5" style={{ background: 'var(--glass-bg-strong)' }}>
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-4">
-                  {lightboxImage.memory.recorded_by && (
-                    <span
-                      className="px-3.5 py-1.5 rounded-full text-sm font-bold"
-                      style={{
-                        backgroundColor: getMemberColor(lightboxImage.memory.recorded_by).activeBg,
-                        color: 'white',
-                        boxShadow: `0 4px 12px ${getMemberColor(lightboxImage.memory.recorded_by).activeBg}40`,
-                      }}
-                    >
-                      {lightboxImage.memory.recorded_by}
-                    </span>
-                  )}
-                  {lightboxImage.memory.child_name && lightboxImage.memory.child_name !== 'null' && (
-                    <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                      über <strong>{lightboxImage.memory.child_name}</strong>
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
-                  <Calendar className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    {format(parseISO(lightboxImage.memory.source_date), 'd. MMMM yyyy', { locale: de })}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {lightboxImage.memory.recorded_by && (
+                  <span
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '999px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      backgroundColor: getMemberColor(lightboxImage.memory.recorded_by).activeBg,
+                      color: 'white',
+                    }}
+                  >
+                    {lightboxImage.memory.recorded_by}
                   </span>
-                </div>
+                )}
+                {lightboxImage.memory.child_name && lightboxImage.memory.child_name !== 'null' && (
+                  <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)' }}>
+                    über <strong style={{ color: 'white' }}>{lightboxImage.memory.child_name}</strong>
+                  </span>
+                )}
               </div>
-              {lightboxImage.memory.cleaned_summary && (
-                <p className="mt-4 text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
-                  {lightboxImage.memory.cleaned_summary}
-                </p>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
+                <Calendar className="w-3.5 h-3.5" />
+                {format(parseISO(lightboxImage.memory.source_date), 'd. MMMM yyyy', { locale: de })}
+              </div>
             </div>
+            {lightboxImage.memory.cleaned_summary && (
+              <p style={{ marginTop: '0.75rem', fontSize: '0.8rem', lineHeight: 1.5, color: 'rgba(255,255,255,0.75)' }}>
+                {lightboxImage.memory.cleaned_summary}
+              </p>
+            )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Create Memory Modal */}
