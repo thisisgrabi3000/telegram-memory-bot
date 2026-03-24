@@ -423,6 +423,82 @@ export const telegramService = {
   },
 
   /**
+   * Extrahiert Video-Daten aus einem Telegram Update.
+   */
+  extractVideoMessage(update: unknown): { chat_id: number; message_id: number; file_id: string; date: number; duration: number; file_size?: number; caption?: string } | null {
+    const u = update as {
+      message?: {
+        chat?: { id?: number };
+        message_id?: number;
+        date?: number;
+        caption?: string;
+        video?: {
+          file_id?: string;
+          duration?: number;
+          file_size?: number;
+          mime_type?: string;
+        };
+      };
+    };
+
+    const message = u?.message;
+    const video = message?.video;
+
+    if (!video || !video.file_id) {
+      return null;
+    }
+
+    return {
+      chat_id: message!.chat!.id!,
+      message_id: message!.message_id!,
+      file_id: video.file_id,
+      date: message!.date!,
+      duration: video.duration ?? 0,
+      file_size: video.file_size,
+      caption: message?.caption,
+    };
+  },
+
+  /**
+   * Lädt ein Video von Telegram herunter und speichert es permanent.
+   * Gibt den Dateinamen (ohne Pfad) zurück.
+   */
+  async downloadVideoFile(fileId: string): Promise<string> {
+    const fileInfoResponse = await fetch(`${TELEGRAM_API}/getFile?file_id=${fileId}`);
+    const fileInfo = await fileInfoResponse.json() as {
+      ok: boolean;
+      result?: { file_path?: string };
+    };
+
+    if (!fileInfo.ok || !fileInfo.result?.file_path) {
+      throw new Error('Konnte Video-Info nicht abrufen');
+    }
+
+    const filePath = fileInfo.result.file_path;
+    const extension = path.extname(filePath) || '.mp4';
+
+    const fileUrl = `${TELEGRAM_FILE_API}/${filePath}`;
+    const fileResponse = await fetch(fileUrl);
+
+    if (!fileResponse.ok) {
+      throw new Error('Konnte Video nicht herunterladen');
+    }
+
+    const uploadsDir = path.resolve('./uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const fileName = `video_${Date.now()}_${fileId.slice(-8)}${extension}`;
+    const localPath = path.join(uploadsDir, fileName);
+
+    const buffer = Buffer.from(await fileResponse.arrayBuffer());
+    fs.writeFileSync(localPath, buffer);
+
+    return fileName;
+  },
+
+  /**
    * Extrahiert Standort-Daten aus einem Telegram Update.
    * Unterstützt sowohl normale Standorte als auch Live-Standorte.
    */

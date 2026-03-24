@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Star, Calendar, User, X, Trash2, ImageIcon, Check, Pencil, Share } from 'lucide-react';
+import { Star, Calendar, User, X, Trash2, Check, Pencil, Share } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import type { Memory, Category } from '../types';
@@ -68,6 +68,8 @@ export function MemoryCard({ memory, index, onDelete, onUpdate }: MemoryCardProp
   const formattedDate = format(date, 'd. MMM yyyy', { locale: de });
   const memberStyle = memory.child_name ? getMemberColor(memory.child_name) : null;
   const hasPhotos = memory.photos && memory.photos.length > 0;
+  const hasVideos = memory.videos && memory.videos.length > 0;
+  const hasCoords = memory.latitude != null && memory.longitude != null;
 
   const handleDeleteClick = () => {
     setShowDeleteConfirm(true);
@@ -135,23 +137,15 @@ export function MemoryCard({ memory, index, onDelete, onUpdate }: MemoryCardProp
                   key={photo.id}
                   className="photo-item"
                   onClick={() => setLightboxPhoto(photo.url)}
-                  style={{
-                    aspectRatio: memory.photos.length === 1 ? '16/10' : undefined,
-                  }}
+                  style={{ aspectRatio: memory.photos.length === 1 ? '16/10' : undefined }}
                 >
-                  <img
-                    src={photo.url}
-                    alt=""
-                    loading="lazy"
-                  />
+                  <img src={photo.url} alt="" loading="lazy" />
                   {photoIndex === 3 && memory.photos.length > 4 && (
                     <div
                       className="absolute inset-0 flex items-center justify-center backdrop-blur-sm"
                       style={{ backgroundColor: 'rgba(42, 33, 24, 0.6)' }}
                     >
-                      <span className="text-white text-3xl font-bold">
-                        +{memory.photos.length - 4}
-                      </span>
+                      <span className="text-white text-3xl font-bold">+{memory.photos.length - 4}</span>
                     </div>
                   )}
                 </div>
@@ -160,16 +154,37 @@ export function MemoryCard({ memory, index, onDelete, onUpdate }: MemoryCardProp
           </div>
         )}
 
-        {/* No photos placeholder */}
-        {!hasPhotos && (
-          <div
-            className="flex items-center justify-center h-28 mb-5 rounded-2xl"
-            style={{
-              background: 'linear-gradient(135deg, var(--color-sand-100) 0%, var(--color-sand-200) 100%)',
-            }}
-          >
-            <ImageIcon className="w-10 h-10" style={{ color: 'var(--color-sand-400)' }} />
+        {/* Videos */}
+        {hasVideos && (
+          <div className="mb-5 space-y-2">
+            {memory.videos.map(video => (
+              <video
+                key={video.id}
+                src={video.url}
+                controls
+                className="w-full rounded-2xl"
+                style={{ maxHeight: '300px', backgroundColor: '#000' }}
+              />
+            ))}
           </div>
+        )}
+
+        {/* Karten-Vorschau wenn kein Foto/Video aber Koordinaten vorhanden */}
+        {!hasPhotos && !hasVideos && hasCoords && (
+          <a
+            href={`https://www.openstreetmap.org/?mlat=${memory.latitude}&mlon=${memory.longitude}&zoom=14`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block mb-5 overflow-hidden rounded-2xl"
+            style={{ height: '7rem' }}
+          >
+            <img
+              src={`https://staticmap.openstreetmap.de/staticmap.php?center=${memory.latitude},${memory.longitude}&zoom=13&size=400x112&markers=${memory.latitude},${memory.longitude},red-pushpin`}
+              alt="Kartenvorschau"
+              className="w-full h-full object-cover"
+              onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
+            />
+          </a>
         )}
 
         {/* Content */}
@@ -401,8 +416,8 @@ export function MemoryCard({ memory, index, onDelete, onUpdate }: MemoryCardProp
           <img
             src={lightboxPhoto}
             alt=""
-            className="max-w-full max-h-full object-contain rounded-3xl animate-fade-in-scale"
-            style={{ boxShadow: 'var(--shadow-2xl)' }}
+            className="object-contain rounded-3xl animate-fade-in-scale"
+            style={{ maxWidth: '90vw', maxHeight: '90vh', boxShadow: 'var(--shadow-2xl)' }}
             onClick={(e) => e.stopPropagation()}
           />
         </div>

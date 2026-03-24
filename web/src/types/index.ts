@@ -80,6 +80,12 @@ export interface Audio {
   filename: string;
 }
 
+export interface Video {
+  id: number;
+  url: string;
+  filename: string;
+}
+
 export interface Memory {
   id: number;
   created_at: string;
@@ -92,6 +98,7 @@ export interface Memory {
   importance_score: number;
   photos: Photo[];
   audios: Audio[];
+  videos: Video[];
   recorded_by: string | null;
   location: string | null;
   is_favorite: boolean;

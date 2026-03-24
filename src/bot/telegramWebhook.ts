@@ -805,6 +805,74 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
       return;
     }
 
+    // Prüfe auf Video-Nachricht
+    const videoMessage = telegramService.extractVideoMessage(update);
+    if (videoMessage) {
+      console.log('Video empfangen:', videoMessage);
+
+      const videoUser = userRepository.findByChatId(videoMessage.chat_id);
+
+      try {
+        const fileName = await telegramService.downloadVideoFile(videoMessage.file_id);
+        console.log('Video gespeichert:', fileName);
+
+        // Finde den letzten Eintrag (innerhalb der letzten 5 Minuten)
+        const lastEntry = memoryRepository.findLast(videoMessage.chat_id);
+        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+
+        if (lastEntry && new Date(lastEntry.created_at).getTime() > fiveMinutesAgo) {
+          mediaRepository.create({
+            memory_entry_id: lastEntry.id,
+            media_type: 'video',
+            telegram_file_id: videoMessage.file_id,
+            local_path: fileName,
+          });
+          await telegramService.sendMessage(videoMessage.chat_id, `🎥 Video zur letzten Erinnerung hinzugefügt`);
+        } else {
+          const sourceDate = new Date(videoMessage.date * 1000).toISOString().split('T')[0];
+          const entry = memoryRepository.create({
+            source_date: sourceDate,
+            source_type: 'photo',
+            source_message_id: videoMessage.message_id,
+            telegram_chat_id: videoMessage.chat_id,
+            raw_transcript: videoMessage.caption || null,
+            transcript_status: 'completed',
+            processing_status: 'pending',
+            recorded_by: videoUser?.display_name ?? null,
+          });
+
+          const storedLocation = chatLocations.get(videoMessage.chat_id);
+          if (storedLocation) {
+            memoryRepository.updateLocation(entry.id, storedLocation.name);
+            memoryRepository.updateCoordinates(entry.id, storedLocation.latitude, storedLocation.longitude);
+          }
+
+          mediaRepository.create({
+            memory_entry_id: entry.id,
+            media_type: 'video',
+            telegram_file_id: videoMessage.file_id,
+            local_path: fileName,
+          });
+
+          memoryRepository.updateSummary(entry.id, {
+            child_name: null,
+            cleaned_summary: videoMessage.caption || '',
+            categories: [],
+            tags: [],
+            people: [],
+            importance_score: 3,
+          });
+
+          await telegramService.sendMessage(videoMessage.chat_id, `🎥 Video-Erinnerung gespeichert!`);
+        }
+      } catch (error) {
+        console.error('Fehler beim Video-Upload:', error);
+        await telegramService.sendMessage(videoMessage.chat_id, '❌ Fehler beim Speichern des Videos.');
+      }
+
+      return;
+    }
+
     // Extrahiere Voice Message
     const voiceMessage = telegramService.extractVoiceMessage(update);
 

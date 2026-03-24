@@ -517,6 +517,13 @@ function transformMemory(entry: MemoryEntry, attachments: MediaAttachment[]) {
         url: `/uploads/${a.local_path}`,
         filename: a.local_path,
       })),
+    videos: attachments
+      .filter(a => a.media_type === 'video')
+      .map(a => ({
+        id: a.id,
+        url: `/uploads/${a.local_path}`,
+        filename: a.local_path,
+      })),
   };
 }
 

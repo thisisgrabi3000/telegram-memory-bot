@@ -9,24 +9,21 @@ interface ApiResponse<T> {
   error?: string;
 }
 
-interface RawMemory extends Omit<Memory, 'photos' | 'audios'> {
+interface RawMemory extends Omit<Memory, 'photos' | 'audios' | 'videos'> {
   photos: Array<{ id: number; url: string; filename: string }>;
   audios: Array<{ id: number; url: string; filename: string }>;
+  videos: Array<{ id: number; url: string; filename: string }>;
 }
 
 // Helper to transform URLs to absolute and ensure arrays
 function transformMemoryUrls(memory: RawMemory): Memory {
+  const toAbsolute = (url: string) => url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
   return {
     ...memory,
-    people: memory.people || [], // Ensure people is always an array
-    photos: memory.photos.map(photo => ({
-      ...photo,
-      url: photo.url.startsWith('http') ? photo.url : `${API_BASE_URL}${photo.url}`,
-    })),
-    audios: (memory.audios || []).map(audio => ({
-      ...audio,
-      url: audio.url.startsWith('http') ? audio.url : `${API_BASE_URL}${audio.url}`,
-    })),
+    people: memory.people || [],
+    photos: memory.photos.map(p => ({ ...p, url: toAbsolute(p.url) })),
+    audios: (memory.audios || []).map(a => ({ ...a, url: toAbsolute(a.url) })),
+    videos: (memory.videos || []).map(v => ({ ...v, url: toAbsolute(v.url) })),
   };
 }
 
