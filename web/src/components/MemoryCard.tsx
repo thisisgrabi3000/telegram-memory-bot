@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Star, Calendar, User, X, Trash2, Check, Pencil, Share } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -396,31 +397,56 @@ export function MemoryCard({ memory, index, onDelete, onUpdate }: MemoryCardProp
         </div>
       )}
 
-      {/* Lightbox */}
-      {lightboxPhoto && (
+      {/* Lightbox – via Portal in document.body um Stacking-Context-Clipping zu vermeiden */}
+      {lightboxPhoto && createPortal(
         <div
-          className="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(42, 33, 24, 0.88)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+          }}
           onClick={() => setLightboxPhoto(null)}
         >
           <button
-            className="absolute top-6 right-6 p-3 rounded-2xl transition-all duration-300 hover:scale-110"
             style={{
+              position: 'absolute',
+              top: '1.5rem',
+              right: '1.5rem',
+              padding: '0.75rem',
+              borderRadius: '1rem',
               backgroundColor: 'rgba(255,255,255,0.95)',
-              color: 'var(--color-text-primary)',
+              border: 'none',
+              cursor: 'pointer',
               boxShadow: 'var(--shadow-lg)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
             onClick={() => setLightboxPhoto(null)}
           >
-            <X className="w-6 h-6" />
+            <X className="w-6 h-6" style={{ color: 'var(--color-text-primary)' }} />
           </button>
           <img
             src={lightboxPhoto}
             alt=""
-            className="object-contain rounded-3xl animate-fade-in-scale"
-            style={{ maxWidth: '90vw', maxHeight: '90vh', boxShadow: 'var(--shadow-2xl)' }}
+            style={{
+              maxWidth: 'calc(100vw - 48px)',
+              maxHeight: 'calc(100vh - 48px)',
+              objectFit: 'contain',
+              borderRadius: '1.5rem',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
+              display: 'block',
+            }}
             onClick={(e) => e.stopPropagation()}
           />
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Export Modal */}
