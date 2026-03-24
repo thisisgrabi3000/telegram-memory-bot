@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Lock, Loader2, AlertCircle, Heart, Sparkles } from 'lucide-react';
 
 interface LoginScreenProps {
-  onLogin: (token: string) => void;
+  onLogin: () => void;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -22,13 +22,14 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ password }),
       });
 
       const data = await response.json();
 
-      if (data.success && data.token) {
-        onLogin(data.token);
+      if (data.success) {
+        onLogin();
       } else {
         setError(data.error || 'Login fehlgeschlagen');
       }

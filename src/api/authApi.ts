@@ -1,93 +1,77 @@
 import { Router } from 'express';
-import crypto from 'crypto';
+import type { Request, Response, NextFunction } from 'express';
 import { env } from '../config/env';
+
+declare module 'express-session' {
+  interface SessionData {
+    authenticated: boolean;
+  }
+}
 
 const router = Router();
 
 /**
- * Generate a simple token from password
+ * Middleware: Checks if session is authenticated.
+ * If no WEB_PASSWORD is configured, all requests pass through.
  */
-function generateToken(password: string): string {
-  return crypto.createHash('sha256').update(password + 'famories-salt').digest('hex');
-}
-
-/**
- * POST /api/auth/login
- * Validates password and returns a token
- */
-router.post('/login', (req, res) => {
-  const { password } = req.body;
-
-  // If no password configured, always allow
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!env.WEB_PASSWORD) {
-    return res.json({
-      success: true,
-      token: 'no-auth-required',
-      message: 'Keine Passwort-Authentifizierung konfiguriert',
-    });
+    return next();
   }
 
-  if (!password || typeof password !== 'string') {
-    return res.status(400).json({
-      success: false,
-      error: 'Passwort erforderlich',
-    });
-  }
-
-  if (password === env.WEB_PASSWORD) {
-    const token = generateToken(password);
-    return res.json({
-      success: true,
-      token,
-      message: 'Login erfolgreich',
-    });
+  if (req.session.authenticated) {
+    return next();
   }
 
   return res.status(401).json({
     success: false,
-    error: 'Falsches Passwort',
+    error: 'Authentifizierung erforderlich',
   });
+}
+
+/**
+ * POST /api/auth/login
+ * Validates password and creates a session
+ */
+router.post('/login', (req, res) => {
+  const { password } = req.body;
+
+  if (!env.WEB_PASSWORD) {
+    req.session.authenticated = true;
+    return res.json({ success: true, message: 'Kein Passwort erforderlich' });
+  }
+
+  if (!password || typeof password !== 'string') {
+    return res.status(400).json({ success: false, error: 'Passwort erforderlich' });
+  }
+
+  if (password !== env.WEB_PASSWORD) {
+    return res.status(401).json({ success: false, error: 'Falsches Passwort' });
+  }
+
+  req.session.authenticated = true;
+  return res.json({ success: true, message: 'Login erfolgreich' });
 });
 
 /**
- * POST /api/auth/verify
- * Verifies if a token is valid
+ * POST /api/auth/logout
+ * Destroys the session
  */
-router.post('/verify', (req, res) => {
-  const { token } = req.body;
-
-  // If no password configured, always valid
-  if (!env.WEB_PASSWORD) {
-    return res.json({
-      success: true,
-      valid: true,
-    });
-  }
-
-  if (!token || typeof token !== 'string') {
-    return res.json({
-      success: true,
-      valid: false,
-    });
-  }
-
-  const expectedToken = generateToken(env.WEB_PASSWORD);
-  const isValid = token === expectedToken;
-
-  return res.json({
-    success: true,
-    valid: isValid,
+router.post('/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.json({ success: true });
   });
 });
 
 /**
  * GET /api/auth/status
- * Returns if password protection is enabled
+ * Returns if password protection is enabled and if current session is authenticated
  */
-router.get('/status', (_req, res) => {
+router.get('/status', (req, res) => {
   res.json({
     success: true,
     passwordRequired: !!env.WEB_PASSWORD,
+    authenticated: !!req.session.authenticated,
   });
 });
 

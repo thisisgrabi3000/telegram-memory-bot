@@ -46,6 +46,9 @@ export const env = {
   // Web Password Protection (optional - if not set, no password required)
   WEB_PASSWORD: getEnvOptional('WEB_PASSWORD'),
 
+  // Session secret for express-session
+  SESSION_SECRET: getEnv('SESSION_SECRET', 'famories-session-secret-change-in-prod'),
+
   // Webhook URL for Telegram
   WEBHOOK_URL: getEnvOptional('WEBHOOK_URL'),
 

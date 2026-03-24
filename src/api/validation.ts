@@ -28,10 +28,14 @@ export const createMemorySchema = z.object({
     .nullable(),
   location: z
     .string()
-    .max(MAX_NAME_LENGTH)
+    .max(200)
     .optional()
     .nullable(),
   source_date: dateSchema.optional(),
+  people: z
+    .array(z.string().max(MAX_NAME_LENGTH))
+    .max(20)
+    .optional(),
 });
 
 /**

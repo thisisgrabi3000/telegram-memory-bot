@@ -1,19 +1,6 @@
 import type { Memory } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-const AUTH_TOKEN_KEY = 'famories_auth_token';
-
-/**
- * Returns auth headers with Bearer token if available.
- */
-function authHeaders(extra?: Record<string, string>): Record<string, string> {
-  const headers: Record<string, string> = { ...extra };
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-}
 
 interface ApiResponse<T> {
   success: boolean;
@@ -45,7 +32,7 @@ function transformMemoryUrls(memory: RawMemory): Memory {
 
 export async function fetchMemories(): Promise<Memory[]> {
   const response = await fetch(`${API_BASE_URL}/api/memories`, {
-    headers: authHeaders(),
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -63,7 +50,7 @@ export async function fetchMemories(): Promise<Memory[]> {
 
 export async function fetchChildren(): Promise<string[]> {
   const response = await fetch(`${API_BASE_URL}/api/children`, {
-    headers: authHeaders(),
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -82,7 +69,7 @@ export async function fetchChildren(): Promise<string[]> {
 export async function deleteMemory(id: number): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/api/memories/${id}`, {
     method: 'DELETE',
-    headers: authHeaders(),
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -99,7 +86,8 @@ export async function deleteMemory(id: number): Promise<void> {
 export async function updateMemory(id: number, cleanedSummary: string): Promise<Memory> {
   const response = await fetch(`${API_BASE_URL}/api/memories/${id}`, {
     method: 'PUT',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ cleaned_summary: cleanedSummary }),
   });
 
@@ -119,7 +107,8 @@ export async function updateMemory(id: number, cleanedSummary: string): Promise<
 export async function toggleFavorite(id: number): Promise<Memory> {
   const response = await fetch(`${API_BASE_URL}/api/memories/${id}/favorite`, {
     method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({}),
   });
 
@@ -147,7 +136,8 @@ export interface CreateMemoryInput {
 export async function createMemory(input: CreateMemoryInput): Promise<Memory> {
   const response = await fetch(`${API_BASE_URL}/api/memories`, {
     method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify(input),
   });
 
@@ -172,7 +162,7 @@ export async function uploadPhotos(id: number, files: File[]): Promise<Memory> {
 
   const response = await fetch(`${API_BASE_URL}/api/memories/${id}/photos`, {
     method: 'POST',
-    headers: authHeaders(),
+    credentials: 'include',
     body: formData,
   });
 
@@ -191,7 +181,7 @@ export async function uploadPhotos(id: number, files: File[]): Promise<Memory> {
 
 export async function searchMemories(query: string): Promise<Memory[]> {
   const response = await fetch(`${API_BASE_URL}/api/memories?search=${encodeURIComponent(query)}`, {
-    headers: authHeaders(),
+    credentials: 'include',
   });
 
   if (!response.ok) {

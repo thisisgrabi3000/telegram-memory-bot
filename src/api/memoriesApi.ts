@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import multer from 'multer';
+import path from 'path';
 import { memoryRepository } from '../db/repositories/memoryRepository';
 import { mediaRepository } from '../db/repositories/mediaRepository';
 import { summarizationService } from '../services/summarizationService';
@@ -14,6 +16,7 @@ import {
   validateQuery,
   validateParams,
 } from './validation';
+import { requireAuth } from './authApi';
 
 /**
  * Sicheres JSON-Parsing mit Fallback.
@@ -28,6 +31,23 @@ function safeJsonParse<T>(json: string | null, fallback: T): T {
 }
 
 const router = Router();
+
+/**
+ * Multer-Konfiguration für Foto-Uploads
+ */
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: path.resolve('./uploads'),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || '.jpg';
+      cb(null, `web_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+  fileFilter: (_req, file, cb) => {
+    cb(null, file.mimetype.startsWith('image/'));
+  },
+});
 
 /**
  * Rate Limiting Konfiguration
@@ -60,7 +80,8 @@ const writeLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Standard-Limiter für alle Routen
+// Auth + Standard-Limiter für alle Routen
+router.use(requireAuth);
 router.use(standardLimiter);
 
 /**
@@ -232,17 +253,16 @@ router.put('/memories/:id', writeLimiter, validateParams(idParamSchema), validat
  */
 router.post('/memories', aiLimiter, validateBody(createMemorySchema), async (req, res) => {
   try {
-    const { text, child_name, location, source_date } = req.body as {
+    const { text, child_name, location, source_date, people: explicitPeople } = req.body as {
       text: string;
       child_name?: string | null;
       location?: string | null;
       source_date?: string;
+      people?: string[];
     };
 
-    // Nutze heutiges Datum wenn keines angegeben
     const date = source_date || new Date().toISOString().split('T')[0];
 
-    // Erstelle Eintrag
     const entry = memoryRepository.create({
       source_date: date,
       source_type: 'web',
@@ -254,34 +274,34 @@ router.post('/memories', aiLimiter, validateBody(createMemorySchema), async (req
       recorded_by: 'Web App',
     });
 
-    // Versuche AI-Zusammenfassung
     try {
       const summary = await summarizationService.summarize(text.trim());
-      memoryRepository.updateSummary(entry.id, summary);
 
-      // Überschreibe child_name wenn explizit angegeben
-      if (child_name) {
-        memoryRepository.updateChildName(entry.id, child_name);
-      }
+      // Merge AI-erkannte mit explizit gewählten Personen
+      const mergedPeople = [...new Set([...(summary.people || []), ...(explicitPeople || [])])];
+
+      memoryRepository.updateSummary(entry.id, {
+        ...summary,
+        // Explizit gewählter child_name hat Vorrang, sonst AI-Ergebnis
+        child_name: child_name !== undefined ? (child_name || null) : summary.child_name,
+        people: mergedPeople,
+      });
     } catch (summaryError) {
       console.error('Zusammenfassung fehlgeschlagen:', summaryError);
-      // Fallback: Speichere ohne AI-Zusammenfassung
       memoryRepository.updateSummary(entry.id, {
         child_name: child_name || null,
         cleaned_summary: text.trim(),
         categories: [],
         tags: [],
-        people: [],
+        people: explicitPeople || [],
         importance_score: 3,
       });
     }
 
-    // Setze Ort wenn angegeben
     if (location) {
       memoryRepository.updateLocation(entry.id, location);
     }
 
-    // Hole aktualisierten Eintrag
     const updatedMemory = memoryRepository.findById(entry.id);
     const attachments = mediaRepository.findByMemoryId(entry.id);
 
@@ -379,6 +399,46 @@ router.post('/memories/:id/favorite', writeLimiter, validateParams(idParamSchema
       success: false,
       error: 'Fehler beim Aktualisieren des Favoriten-Status',
     });
+  }
+});
+
+/**
+ * POST /api/memories/:id/photos
+ * Lädt Fotos zu einer bestehenden Erinnerung hoch
+ */
+router.post('/memories/:id/photos', writeLimiter, validateParams(idParamSchema), upload.array('photos', 10), (req, res) => {
+  try {
+    const { id } = req.params as unknown as { id: number };
+
+    const memory = memoryRepository.findById(id);
+    if (!memory) {
+      return res.status(404).json({ success: false, error: 'Erinnerung nicht gefunden' });
+    }
+
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ success: false, error: 'Keine Dateien hochgeladen' });
+    }
+
+    for (const file of files) {
+      mediaRepository.create({
+        memory_entry_id: id,
+        media_type: 'photo',
+        telegram_file_id: `web_${file.filename}`,
+        local_path: file.filename,
+      });
+    }
+
+    const attachments = mediaRepository.findByMemoryId(id);
+    const updatedMemory = memoryRepository.findById(id);
+
+    res.json({
+      success: true,
+      data: transformMemory(updatedMemory!, attachments),
+    });
+  } catch (error) {
+    console.error('API Error:', error);
+    res.status(500).json({ success: false, error: 'Fehler beim Hochladen der Fotos' });
   }
 });
 

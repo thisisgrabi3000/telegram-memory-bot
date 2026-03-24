@@ -5,9 +5,6 @@ import type { Memory } from './types';
 import { Loader2, Heart, RefreshCw, AlertTriangle } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-const AUTH_TOKEN_KEY = 'famories_auth_token';
-const AUTH_EXPIRY_KEY = 'famories_auth_expiry';
-const AUTH_DURATION_DAYS = 30;
 
 function App() {
   const [memories, setMemories] = useState<Memory[]>([]);
@@ -29,93 +26,18 @@ function App() {
   }, [isAuthenticated]);
 
   async function checkAuth() {
-    setCheckingAuth(true);
-
     try {
-      // First check if password protection is enabled
-      const statusResponse = await fetch(`${API_BASE_URL}/api/auth/status`);
-      const statusData = await statusResponse.json();
-
-      if (!statusData.passwordRequired) {
-        // No password required, skip authentication
-        setIsAuthenticated(true);
-        setCheckingAuth(false);
-        return;
-      }
-
-      // Check for token in URL (for direct links to Oma & Opa)
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlToken = urlParams.get('token');
-
-      if (urlToken) {
-        // Verify URL token
-        const verifyResponse = await fetch(`${API_BASE_URL}/api/auth/verify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: urlToken }),
-        });
-        const verifyData = await verifyResponse.json();
-
-        if (verifyData.valid) {
-          // Save token and remove from URL
-          const expiry = Date.now() + AUTH_DURATION_DAYS * 24 * 60 * 60 * 1000;
-          localStorage.setItem(AUTH_TOKEN_KEY, urlToken);
-          localStorage.setItem(AUTH_EXPIRY_KEY, expiry.toString());
-          window.history.replaceState({}, '', window.location.pathname);
-          setIsAuthenticated(true);
-          setCheckingAuth(false);
-          return;
-        }
-      }
-
-      // Password required - check saved token
-      const savedToken = localStorage.getItem(AUTH_TOKEN_KEY);
-      const savedExpiry = localStorage.getItem(AUTH_EXPIRY_KEY);
-
-      if (!savedToken || !savedExpiry) {
-        setIsAuthenticated(false);
-        setCheckingAuth(false);
-        return;
-      }
-
-      // Check if token expired
-      if (Date.now() > parseInt(savedExpiry, 10)) {
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        localStorage.removeItem(AUTH_EXPIRY_KEY);
-        setIsAuthenticated(false);
-        setCheckingAuth(false);
-        return;
-      }
-
-      // Verify token with server
-      const verifyResponse = await fetch(`${API_BASE_URL}/api/auth/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: savedToken }),
-      });
-      const verifyData = await verifyResponse.json();
-
-      if (verifyData.valid) {
-        setIsAuthenticated(true);
-      } else {
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        localStorage.removeItem(AUTH_EXPIRY_KEY);
-        setIsAuthenticated(false);
-      }
-    } catch (err) {
-      console.error('Auth check failed:', err);
-      // On error, assume not authenticated to be safe
+      const res = await fetch(`${API_BASE_URL}/api/auth/status`, { credentials: 'include' });
+      const data = await res.json();
+      setIsAuthenticated(!data.passwordRequired || data.authenticated);
+    } catch {
       setIsAuthenticated(false);
     } finally {
       setCheckingAuth(false);
     }
   }
 
-  function handleLogin(token: string) {
-    // Save token with 30-day expiry
-    const expiry = Date.now() + AUTH_DURATION_DAYS * 24 * 60 * 60 * 1000;
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
-    localStorage.setItem(AUTH_EXPIRY_KEY, expiry.toString());
+  function handleLogin() {
     setIsAuthenticated(true);
   }
 

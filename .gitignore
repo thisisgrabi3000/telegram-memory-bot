@@ -19,6 +19,13 @@ data/
 .vscode/
 .idea/
 
+# Claude / Agent skills (local tooling, not part of the app)
+.agents/
+.claude/
+web/.agents/
+web/.claude/
+skills-lock.json
+
 # Logs
 *.log
 
