@@ -436,12 +436,13 @@ export function MemoryCard({ memory, index, onDelete, onUpdate }: MemoryCardProp
             src={lightboxPhoto}
             alt=""
             style={{
-              maxWidth: 'calc(100vw - 48px)',
-              maxHeight: 'calc(100vh - 48px)',
+              maxHeight: 'calc(100vh - 80px)',
+              maxWidth: 'calc(100vw - 40px)',
               objectFit: 'contain',
+              display: 'block',
+              margin: 'auto',
               borderRadius: '1.5rem',
               boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
-              display: 'block',
             }}
             onClick={(e) => e.stopPropagation()}
           />
