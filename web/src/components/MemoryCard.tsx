@@ -438,9 +438,9 @@ export function MemoryCard({ memory, index, onDelete, onUpdate }: MemoryCardProp
             style={{
               maxHeight: 'calc(100vh - 80px)',
               maxWidth: 'calc(100vw - 40px)',
-              objectFit: 'contain',
+              width: 'auto',
+              height: 'auto',
               display: 'block',
-              margin: 'auto',
               borderRadius: '1.5rem',
               boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
             }}
