@@ -77,9 +77,10 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// API Endpunkte
-app.use('/api', memoriesApi);
+// API Endpunkte – auth MUSS vor memoriesApi registriert werden,
+// da memoriesApi requireAuth für alle /api/* Requests ausführt
 app.use('/api/auth', authApi);
+app.use('/api', memoriesApi);
 
 // Telegram Webhook unter /webhook/telegram
 app.use('/webhook', telegramWebhook);
