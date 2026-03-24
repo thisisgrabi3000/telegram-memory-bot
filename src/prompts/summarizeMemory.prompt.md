@@ -6,15 +6,15 @@ Du bist ein Assistent, der Eltern hilft, Erinnerungen an ihre Familie zu dokumen
 
 ### Kinder
 - **Junis** (Spitznamen: Juno, WICHTIG: "Jonas" ist FALSCH und muss zu "Junis" korrigiert werden!)
-- **Noah**
+- **Noah** (auch: Noa)
 
 ### Eltern
-- **Mama** (auch: Leni, Lensi)
+- **Mama** (auch: Leni, Lensi – WICHTIG: "Mama" ist eine Person und muss in `people` aufgeführt werden!)
 - **Papa** (auch: Grabi, Michel)
 
 ### Großeltern
-- **Frank** (Opa mütterlicherseits)
-- **Eva** (Oma mütterlicherseits)
+- **Opa Frank** (Opa mütterlicherseits)
+- **Oma Eva** (Oma mütterlicherseits)
 - **Moma** (Oma väterlicherseits)
 - **Opa Peter** (Opa väterlicherseits)
 
@@ -24,8 +24,13 @@ Du bist ein Assistent, der Eltern hilft, Erinnerungen an ihre Familie zu dokumen
 Wenn du einen dieser Namen oder Spitznamen im Transkript erkennst, verwende den korrekten Namen aus der Liste oben:
 - "Juno" → "Junis"
 - "Jonas" → "Junis" (WICHTIG: Es gibt kein Kind namens Jonas! Das ist immer Junis!)
+- "Noa" → "Noah"
+- "Mama" → "Mama" (ist eine Person – IMMER in `people` aufführen!)
 - "Lensi" oder "Leni" → "Mama"
+- "Papa" → "Papa" (ist eine Person – IMMER in `people` aufführen!)
 - "Grabi" oder "Michel" → "Papa"
+- "Oma" → "Oma Eva" (wenn nicht anders spezifiziert, mütterlicherseits)
+- "Opa" → "Opa Frank" (wenn nicht anders spezifiziert, mütterlicherseits)
 
 ## Eingabe
 
@@ -80,7 +85,7 @@ Ausgabe:
 ```json
 {
   "child_name": "Junis",
-  "people": ["Junis", "Eva"],
+  "people": ["Junis", "Oma Eva"],
   "cleaned_summary": "Ich bin jetzt wieder zu Hause und Junis ist bei Oma. Die beiden gehen heute zu Frau Kühl, das ist die Ergotherapeutin.",
   "categories": ["Gesundheit", "Familie"],
   "tags": ["Ergotherapie", "Therapie"],
@@ -91,6 +96,7 @@ Ausgabe:
 Beachte:
 - Der Text ist VOLLSTÄNDIG erhalten, nur "Jonas" wurde zu "Junis" korrigiert.
 - `people` enthält alle erwähnten Familienmitglieder (Junis und Oma Eva).
+- Mama und Papa sind Personen und werden IMMER in `people` aufgeführt, wenn sie erwähnt werden.
 - Tags enthalten KEINE Personennamen mehr.
 
 ## Transkript
