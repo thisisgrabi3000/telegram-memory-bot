@@ -397,22 +397,20 @@ export function MemoryCard({ memory, index, onDelete, onUpdate }: MemoryCardProp
         </div>
       )}
 
-      {/* Lightbox – via Portal in document.body um Stacking-Context-Clipping zu vermeiden */}
+      {/* Lightbox – via Portal in document.body */}
       {lightboxPhoto && createPortal(
         <div
           style={{
             position: 'fixed',
             inset: 0,
             zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             background: 'rgba(42, 33, 24, 0.88)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
           }}
           onClick={() => setLightboxPhoto(null)}
         >
+          {/* X-Button */}
           <button
             style={{
               position: 'absolute',
@@ -423,24 +421,29 @@ export function MemoryCard({ memory, index, onDelete, onUpdate }: MemoryCardProp
               backgroundColor: 'rgba(255,255,255,0.95)',
               border: 'none',
               cursor: 'pointer',
-              boxShadow: 'var(--shadow-lg)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              zIndex: 1,
             }}
             onClick={() => setLightboxPhoto(null)}
           >
-            <X className="w-6 h-6" style={{ color: 'var(--color-text-primary)' }} />
+            <X className="w-6 h-6" style={{ color: '#1a1a1a' }} />
           </button>
+          {/* Bild: absolut zentriert, unabhängig vom Flex-Kontext */}
           <img
             src={lightboxPhoto}
             alt=""
             style={{
-              maxHeight: 'calc(100vh - 80px)',
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
               maxWidth: 'calc(100vw - 40px)',
+              maxHeight: 'calc(100vh - 80px)',
               width: 'auto',
               height: 'auto',
-              display: 'block',
               borderRadius: '1.5rem',
               boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
             }}
