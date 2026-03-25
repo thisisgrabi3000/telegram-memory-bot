@@ -45,6 +45,12 @@ export function LocationAutocomplete({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, []);
+
   function handleInputChange(val: string) {
     onChange(val);
     onSelect(null); // clear any previously selected coordinates
