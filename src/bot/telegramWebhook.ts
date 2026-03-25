@@ -254,6 +254,9 @@ function formatEntry(entry: {
  * Verarbeitet den /delete oder "lösche letzte" Befehl.
  */
 async function handleDelete(chatId: number): Promise<void> {
+  // Clear any pending location request for this chat
+  pendingLocationRequests.delete(chatId);
+
   const lastEntry = memoryRepository.findLast(chatId);
 
   if (!lastEntry) {
