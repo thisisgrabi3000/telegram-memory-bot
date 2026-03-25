@@ -29,14 +29,24 @@ const pendingTranscriptions = new Map<number, PendingTranscription>();
 
 /**
  * Pending description requests after photo save (no caption).
- * Key: chat_id, Value: pending data for description + follow-up location prompt
+ * Key: chat_id, Value: pending data
  */
 interface PendingDescription {
   memoryId: number;
-  needsLocation: boolean; // whether to ask for location after description
-  exifText: string;       // for confirmation message
+  needsLocation: boolean;
+  exifText: string;
 }
 const pendingDescriptionRequests = new Map<number, PendingDescription>();
+
+/**
+ * Pending date requests after description (or description skip).
+ * Key: chat_id, Value: pending data
+ */
+interface PendingDate {
+  memoryId: number;
+  needsLocation: boolean;
+}
+const pendingDateRequests = new Map<number, PendingDate>();
 
 /**
  * Pending location requests after photo save.
@@ -267,6 +277,7 @@ function formatEntry(entry: {
 async function handleDelete(chatId: number): Promise<void> {
   // Clear any pending requests for this chat
   pendingDescriptionRequests.delete(chatId);
+  pendingDateRequests.delete(chatId);
   pendingLocationRequests.delete(chatId);
 
   const lastEntry = memoryRepository.findLast(chatId);
@@ -574,9 +585,51 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
           }
         }
 
+        // Ask for date next
+        pendingDateRequests.set(textMessage.chat_id, {
+          memoryId: pendingDesc.memoryId,
+          needsLocation: pendingDesc.needsLocation,
+        });
+        await telegramService.sendMessage(
+          textMessage.chat_id,
+          '📅 Wann war das? (Format: TT.MM.JJJJ oder /skip)'
+        );
+        return;
+      }
+
+      // Check if awaiting a date for a photo
+      const pendingDate = pendingDateRequests.get(textMessage.chat_id);
+      if (pendingDate !== undefined) {
+        pendingDateRequests.delete(textMessage.chat_id);
+
+        const dText = textMessage.text.trim();
+        const isSkip = dText === '/skip' || dText.toLowerCase() === 'skip' || dText.toLowerCase() === 'überspringen';
+
+        if (!isSkip) {
+          // Parse DD.MM.YYYY → YYYY-MM-DD
+          const match = dText.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+          if (match) {
+            const [, day, month, year] = match;
+            const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            memoryRepository.updateDate(pendingDate.memoryId, isoDate);
+            await telegramService.sendMessage(
+              textMessage.chat_id,
+              `📅 Datum gespeichert: ${dText}`
+            );
+          } else {
+            await telegramService.sendMessage(
+              textMessage.chat_id,
+              '⚠️ Ungültiges Format. Bitte TT.MM.JJJJ verwenden (z.B. 25.12.2024).'
+            );
+            // Re-ask for date
+            pendingDateRequests.set(textMessage.chat_id, pendingDate);
+            return;
+          }
+        }
+
         // If no location yet, ask for it now
-        if (pendingDesc.needsLocation) {
-          pendingLocationRequests.set(textMessage.chat_id, pendingDesc.memoryId);
+        if (pendingDate.needsLocation) {
+          pendingLocationRequests.set(textMessage.chat_id, pendingDate.memoryId);
           await telegramService.sendMessage(
             textMessage.chat_id,
             '📍 Wo wurde das aufgenommen? (Ort eingeben oder überspringen mit /skip)'
@@ -705,8 +758,21 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
           const pendingDescSkip = pendingDescriptionRequests.get(command.chat_id);
           if (pendingDescSkip !== undefined) {
             pendingDescriptionRequests.delete(command.chat_id);
-            if (pendingDescSkip.needsLocation) {
-              pendingLocationRequests.set(command.chat_id, pendingDescSkip.memoryId);
+            pendingDateRequests.set(command.chat_id, {
+              memoryId: pendingDescSkip.memoryId,
+              needsLocation: pendingDescSkip.needsLocation,
+            });
+            await telegramService.sendMessage(
+              command.chat_id,
+              '📅 Wann war das? (Format: TT.MM.JJJJ oder /skip)'
+            );
+            return;
+          }
+          const pendingDateSkip = pendingDateRequests.get(command.chat_id);
+          if (pendingDateSkip !== undefined) {
+            pendingDateRequests.delete(command.chat_id);
+            if (pendingDateSkip.needsLocation) {
+              pendingLocationRequests.set(command.chat_id, pendingDateSkip.memoryId);
               await telegramService.sendMessage(
                 command.chat_id,
                 '📍 Wo wurde das aufgenommen? (Ort eingeben oder überspringen mit /skip)'

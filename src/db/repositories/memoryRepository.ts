@@ -216,6 +216,16 @@ export const memoryRepository = {
   },
 
   /**
+   * Aktualisiert das Datum eines Eintrags
+   */
+  updateDate(id: number, date: string): boolean {
+    const db = getDatabase();
+    const stmt = db.prepare('UPDATE memory_entries SET source_date = ? WHERE id = ?');
+    const result = stmt.run(date, id);
+    return result.changes > 0;
+  },
+
+  /**
    * Aktualisiert die Zusammenfassung/Text eines Eintrags (für manuelle Bearbeitung)
    */
   updateText(id: number, cleanedSummary: string): boolean {

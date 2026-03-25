@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HomeScreen, LoginScreen } from './components';
-import { fetchMemories, updateMemory, deleteMemory, toggleFavorite, createMemory, uploadPhotos, deletePhoto } from './api/memoriesApi';
+import { fetchMemories, updateMemory, updateMemoryDate, deleteMemory, toggleFavorite, createMemory, uploadPhotos, deletePhoto } from './api/memoriesApi';
 import type { Memory } from './types';
 import { Loader2, Heart, RefreshCw, AlertTriangle } from 'lucide-react';
 
@@ -58,6 +58,11 @@ function App() {
 
   async function handleUpdate(id: number, text: string) {
     const updated = await updateMemory(id, text);
+    setMemories(prev => prev.map(m => m.id === id ? updated : m));
+  }
+
+  async function handleUpdateDate(id: number, date: string) {
+    const updated = await updateMemoryDate(id, date);
     setMemories(prev => prev.map(m => m.id === id ? updated : m));
   }
 
@@ -279,6 +284,7 @@ function App() {
     <HomeScreen
       memories={memories}
       onUpdate={handleUpdate}
+      onUpdateDate={handleUpdateDate}
       onDelete={handleDelete}
       onToggleFavorite={handleToggleFavorite}
       onCreate={handleCreate}

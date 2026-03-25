@@ -18,16 +18,17 @@ interface MapViewProps {
 }
 
 /**
- * Groups memories that share the same rounded coordinates (within ~100m).
+ * Groups memories by location name (if set) or rounded coordinates (~100m).
+ * Memories sharing a location name are shown under one pin regardless of coords.
  */
 function groupByLocation(memories: Memory[]): Map<string, Memory[]> {
   const groups = new Map<string, Memory[]>();
 
   for (const memory of memories) {
-    // Round to ~100m precision for grouping
-    const lat = Math.round(memory.latitude! * 1000) / 1000;
-    const lng = Math.round(memory.longitude! * 1000) / 1000;
-    const key = `${lat},${lng}`;
+    // Use location name as key when available, otherwise use rounded coords
+    const key = memory.location
+      ? `loc:${memory.location.toLowerCase().trim()}`
+      : `${Math.round(memory.latitude! * 1000) / 1000},${Math.round(memory.longitude! * 1000) / 1000}`;
 
     const existing = groups.get(key) || [];
     existing.push(memory);

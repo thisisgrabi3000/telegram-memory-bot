@@ -5,7 +5,7 @@ import { de } from 'date-fns/locale';
 import {
   ChevronDown, X, Calendar, User, MessageCircle, Image as ImageIcon,
   Pencil, Check, Trash2, Search, MapPin, Star, Plus, Mic, Heart,
-  Sparkles, SlidersHorizontal, Clock, Camera, Settings, HelpCircle,
+  Sparkles, SlidersHorizontal, Camera, Settings, HelpCircle,
   Type, Contrast, Link2, Map, List
 } from 'lucide-react';
 import type { Memory } from '../types';
@@ -16,6 +16,7 @@ import { MapView } from './MapView';
 interface HomeScreenProps {
   memories: Memory[];
   onUpdate?: (id: number, text: string) => Promise<void>;
+  onUpdateDate?: (id: number, date: string) => Promise<void>;
   onDelete?: (id: number) => Promise<void>;
   onToggleFavorite?: (id: number) => Promise<void>;
   onCreate?: (data: {
@@ -52,20 +53,6 @@ function getTimeFilterRange(filter: TimeFilter, customStart?: string, customEnd?
   }
 }
 
-function formatRelativeTime(dateStr: string): string {
-  const date = parseISO(dateStr);
-  const now = new Date();
-  const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-
-  if (diffHours < 1) return 'Gerade eben';
-  if (diffHours < 24) return `vor ${diffHours} Std.`;
-
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays === 1) return 'Gestern';
-  if (diffDays < 7) return `vor ${diffDays} Tagen`;
-
-  return format(date, 'd. MMM', { locale: de });
-}
 
 function getMemberColor(name: string | null) {
   if (!name || name === 'null') return { activeBg: '#927a5e', text: '#635445' };
@@ -83,7 +70,7 @@ const FONT_SIZE_CLASSES: Record<FontSize, string> = {
   xlarge: 'font-xlarge',
 };
 
-export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onCreate, onDeletePhoto }: HomeScreenProps) {
+export function HomeScreen({ memories, onUpdate, onUpdateDate, onDelete, onToggleFavorite, onCreate, onDeletePhoto }: HomeScreenProps) {
   const [personFilter, setPersonFilter] = useState<string>('Alle');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('7d');
   const [locationFilter, setLocationFilter] = useState<string>('Alle');
@@ -110,6 +97,11 @@ export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onC
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Date edit state
+  const [editingDateId, setEditingDateId] = useState<number | null>(null);
+  const [editDateValue, setEditDateValue] = useState('');
+  const [isSavingDate, setIsSavingDate] = useState(false);
 
   // Delete state
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -237,7 +229,7 @@ export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onC
   const textEntries = useMemo(() => {
     return filteredMemories
       .filter(m => m.cleaned_summary && m.cleaned_summary.length > 0)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      .sort((a, b) => new Date(b.source_date).getTime() - new Date(a.source_date).getTime());
   }, [filteredMemories]);
 
   // Get all photos from filtered memories
@@ -571,10 +563,57 @@ export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onC
                               {memory.location}
                             </span>
                           )}
-                          <span className="text-xs ml-auto flex items-center gap-1" style={{ color: 'var(--color-text-light)' }}>
-                            <Clock className="w-3 h-3" />
-                            {formatRelativeTime(memory.created_at)}
-                          </span>
+                          {editingDateId === memory.id ? (
+                            <div className="ml-auto flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                              <input
+                                type="date"
+                                value={editDateValue}
+                                onChange={e => setEditDateValue(e.target.value)}
+                                className="text-xs px-2 py-1 rounded-lg border focus:outline-none"
+                                style={{ borderColor: 'var(--color-sand-300)', color: 'var(--color-text-primary)', backgroundColor: 'white' }}
+                                autoFocus
+                                disabled={isSavingDate}
+                              />
+                              <button
+                                disabled={isSavingDate || !editDateValue}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!onUpdateDate || !editDateValue) return;
+                                  setIsSavingDate(true);
+                                  try {
+                                    await onUpdateDate(memory.id, editDateValue);
+                                    setEditingDateId(null);
+                                  } finally {
+                                    setIsSavingDate(false);
+                                  }
+                                }}
+                                className="text-xs px-2 py-1 rounded-lg font-bold text-white disabled:opacity-50"
+                                style={{ backgroundColor: 'var(--color-sage-500)' }}
+                              >
+                                {isSavingDate ? '...' : '✓'}
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingDateId(null); }}
+                                className="text-xs px-2 py-1 rounded-lg"
+                                style={{ backgroundColor: 'var(--color-sand-200)', color: 'var(--color-text-muted)' }}
+                              >✕</button>
+                            </div>
+                          ) : (
+                            <span
+                              className="text-xs ml-auto flex items-center gap-1"
+                              style={{ color: 'var(--color-text-light)', cursor: onUpdateDate ? 'pointer' : 'default', borderBottom: onUpdateDate ? '1px dashed var(--color-sand-300)' : 'none' }}
+                              title={onUpdateDate ? 'Datum bearbeiten' : undefined}
+                              onClick={(e) => {
+                                if (!onUpdateDate) return;
+                                e.stopPropagation();
+                                setEditDateValue(memory.source_date);
+                                setEditingDateId(memory.id);
+                              }}
+                            >
+                              <Calendar className="w-3 h-3" />
+                              {format(parseISO(memory.source_date), 'd. MMM yyyy', { locale: de })}
+                            </span>
+                          )}
 
                           {/* Favorite Button */}
                           {onToggleFavorite && !isEditing && !isDeleteConfirm && (
@@ -1296,7 +1335,61 @@ export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onC
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
                 <Calendar className="w-3.5 h-3.5" />
-                {format(parseISO(lightboxImage.memory.source_date), 'd. MMMM yyyy', { locale: de })}
+                {editingDateId === lightboxImage.memory.id ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }} onClick={e => e.stopPropagation()}>
+                    <input
+                      type="date"
+                      value={editDateValue}
+                      onChange={e => setEditDateValue(e.target.value)}
+                      style={{
+                        padding: '0.2rem 0.4rem',
+                        borderRadius: '0.4rem',
+                        border: '1px solid rgba(255,255,255,0.4)',
+                        backgroundColor: 'rgba(255,255,255,0.15)',
+                        color: 'white',
+                        fontSize: '0.8rem',
+                      }}
+                      autoFocus
+                      disabled={isSavingDate}
+                    />
+                    <button
+                      disabled={isSavingDate || !editDateValue}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (!onUpdateDate || !editDateValue) return;
+                        setIsSavingDate(true);
+                        try {
+                          await onUpdateDate(lightboxImage.memory.id, editDateValue);
+                          setEditingDateId(null);
+                        } finally {
+                          setIsSavingDate(false);
+                        }
+                      }}
+                      style={{ padding: '0.2rem 0.5rem', borderRadius: '0.4rem', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(255,255,255,0.9)', color: '#1a1a1a', opacity: isSavingDate ? 0.6 : 1 }}
+                    >
+                      {isSavingDate ? '...' : '✓'}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingDateId(null); }}
+                      style={{ padding: '0.2rem 0.4rem', borderRadius: '0.4rem', border: 'none', cursor: 'pointer', fontSize: '0.75rem', backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <span
+                    style={{ cursor: onUpdateDate ? 'pointer' : 'default', borderBottom: onUpdateDate ? '1px dashed rgba(255,255,255,0.4)' : 'none' }}
+                    title={onUpdateDate ? 'Datum bearbeiten' : undefined}
+                    onClick={(e) => {
+                      if (!onUpdateDate) return;
+                      e.stopPropagation();
+                      setEditDateValue(lightboxImage.memory.source_date);
+                      setEditingDateId(lightboxImage.memory.id);
+                    }}
+                  >
+                    {format(parseISO(lightboxImage.memory.source_date), 'd. MMMM yyyy', { locale: de })}
+                  </span>
+                )}
               </div>
             </div>
             {lightboxImage.memory.cleaned_summary && (

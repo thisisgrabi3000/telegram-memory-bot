@@ -10,6 +10,7 @@ import type { MemoryEntry, MediaAttachment } from '../types';
 import {
   createMemorySchema,
   updateMemorySchema,
+  updateDateSchema,
   favoriteSchema,
   memoriesQuerySchema,
   idParamSchema,
@@ -246,6 +247,36 @@ router.put('/memories/:id', writeLimiter, validateParams(idParamSchema), validat
       success: false,
       error: 'Fehler beim Aktualisieren der Erinnerung',
     });
+  }
+});
+
+/**
+ * PATCH /api/memories/:id/date
+ * Aktualisiert das Datum einer Erinnerung
+ */
+router.patch('/memories/:id/date', writeLimiter, validateParams(idParamSchema), validateBody(updateDateSchema), (req, res) => {
+  try {
+    const { id } = req.params as unknown as { id: number };
+    const { source_date } = req.body as { source_date: string };
+
+    const memory = memoryRepository.findById(id);
+    if (!memory) {
+      return res.status(404).json({ success: false, error: 'Erinnerung nicht gefunden' });
+    }
+
+    memoryRepository.updateDate(id, source_date);
+
+    const updatedMemory = memoryRepository.findById(id);
+    const attachments = mediaRepository.findByMemoryId(id);
+
+    res.json({
+      success: true,
+      message: 'Datum aktualisiert',
+      data: transformMemory(updatedMemory!, attachments),
+    });
+  } catch (error) {
+    console.error('API Error:', error);
+    res.status(500).json({ success: false, error: 'Fehler beim Aktualisieren des Datums' });
   }
 });
 

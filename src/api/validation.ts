@@ -60,6 +60,13 @@ export const updateMemorySchema = z.object({
 });
 
 /**
+ * Schema für PATCH /memories/:id/date
+ */
+export const updateDateSchema = z.object({
+  source_date: dateSchema,
+});
+
+/**
  * Schema für POST /memories/:id/favorite
  */
 export const favoriteSchema = z.object({
