@@ -1,308 +1,437 @@
-# Famories - Codebase Reference
+# Famories – Projektdokumentation
 
-> Telegram Memory Bot + Web-App. Familienerinnerungen per Sprachnachricht, Foto und Text speichern und in einer Web-App ansehen.
+Famories ist eine private Familien-Erinnerungs-App. Eltern können über einen Telegram-Bot Sprachnotizen, Fotos, Videos und Standorte aufnehmen. Die App verarbeitet diese automatisch per KI (Transkription + Zusammenfassung) und speichert sie strukturiert in einer SQLite-Datenbank. Über eine passwortgeschützte Web-App können die Erinnerungen durchsucht, gefiltert, bearbeitet und exportiert werden.
+
+Produktiv erreichbar unter: **famories.info**
+
+---
 
 ## Tech Stack
 
-| Layer | Technologie |
-|-------|------------|
-| Backend | Node.js + Express + TypeScript |
-| Database | SQLite (better-sqlite3, WAL-Modus) |
-| AI | OpenAI Whisper (Transkription) + GPT-4o-mini (Zusammenfassung) |
-| Bot | Telegram Bot API (Webhook) |
-| Frontend | React 18 + Vite + Tailwind CSS 4 + Leaflet |
-| Auth | SHA256-Token (Passwort + Salt) |
+| Schicht | Technologie |
+|---|---|
+| Backend | Node.js 20, TypeScript, Express |
+| Datenbank | SQLite via `better-sqlite3` (synchron, WAL-Modus) |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS v4 |
+| Telegram Bot | Telegram Bot API (Webhook, kein Polling) |
+| KI – Transkription | OpenAI Whisper (`whisper-1`) |
+| KI – Zusammenfassung | OpenAI GPT-4o-mini (strukturierter JSON-Output) |
+| Eingabevalidierung | Zod (alle API-Eingaben) |
+| Session / Auth | `express-session` mit httpOnly-Cookies |
+| Scheduler | `node-cron` |
+| Bildmetadaten | `exifr` (GPS-Koordinaten aus EXIF) |
+| Karte | Leaflet + react-leaflet-cluster |
+| Export | html2canvas (PNG-Export einzelner Karten) |
+
+---
 
 ## Projektstruktur
 
 ```
 /
-├── src/                          # Backend
-│   ├── index.ts                  # Express-Server, CORS, Startup, Graceful Shutdown
-│   ├── types/index.ts            # Alle TypeScript-Interfaces (MemoryEntry, etc.)
+├── src/                          # Backend (Node.js/Express)
+│   ├── index.ts                  # Einstiegspunkt: Express-Server, CORS, Session, Graceful Shutdown
+│   ├── types.ts                  # Alle TypeScript-Interfaces (MemoryEntry, MediaAttachment, etc.)
 │   ├── config/
-│   │   ├── env.ts                # Env-Validierung (TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, etc.)
-│   │   ├── children.ts           # CHILDREN, FAMILY_MEMBERS, LOCATIONS + resolveChildName()
-│   │   ├── speakers.ts           # SPEAKERS (Chat-ID→Person), PERSONS, Transkript-Analyse
-│   │   └── allowedChats.ts       # ALLOWED_CHAT_IDS aus Env, isChatAllowed()
+│   │   ├── env.ts                # Env-Validierung beim Start (wirft bei fehlenden Pflicht-Variablen)
+│   │   ├── children.ts           # Bekannte Kindernamen + resolveChildName() + getChildrenInfo()
+│   │   ├── speakers.ts           # SPEAKERS: Chat-ID → Sprechername
+│   │   └── allowedChats.ts       # ALLOWED_CHAT_IDS (aus Env), isChatAllowed()
 │   ├── bot/
-│   │   ├── telegramWebhook.ts    # POST /webhook/telegram - Hauptlogik (Voice, Photo, Commands)
-│   │   └── telegramService.ts    # Telegram API-Wrapper (sendMessage, download, extract*)
+│   │   ├── telegramWebhook.ts    # Haupt-Webhook-Handler: Verarbeitung aller Nachrichtentypen + Befehle
+│   │   └── telegramService.ts    # Telegram-API-Wrapper: sendMessage, downloadFile, extract*()
 │   ├── api/
-│   │   ├── memoriesApi.ts        # REST API: GET/POST/PUT/DELETE /api/memories + Auth-Middleware
-│   │   ├── authApi.ts            # POST /api/auth/login|verify, GET /api/auth/status + requireAuth()
-│   │   └── validation.ts         # Zod-Schemas + Middleware-Factories (validateBody/Query/Params)
+│   │   ├── memoriesApi.ts        # REST-API: GET/POST/PUT/DELETE /api/memories + Foto-Upload
+│   │   ├── authApi.ts            # POST /login, POST /logout, GET /status + requireAuth()-Middleware
+│   │   └── validation.ts         # Zod-Schemas + validateBody/validateQuery/validateParams Middlewares
 │   ├── db/
-│   │   ├── client.ts             # SQLite Singleton (getDatabase/closeDatabase)
-│   │   ├── migrate.ts            # Migration-Runner (standalone: tsx src/db/migrate.ts)
-│   │   ├── index.ts              # Re-exports
-│   │   ├── repositories/
-│   │   │   ├── memoryRepository.ts  # CRUD + findLast(chatId?), search, findByWeek, etc.
-│   │   │   ├── mediaRepository.ts   # CRUD für media_attachments
-│   │   │   └── userRepository.ts    # telegram_users CRUD
-│   │   └── migrations/           # 001-006 (Schema, Users, Location, Indexes, People, Coords)
+│   │   ├── client.ts             # SQLite-Singleton (getDatabase / closeDatabase)
+│   │   ├── migrate.ts            # Migrations-Runner
+│   │   ├── migrations/           # 001–006 (Schema, Users, Location+Favorite, Indexes, People, Koordinaten)
+│   │   └── repositories/
+│   │       ├── memoryRepository.ts   # CRUD, search, findByDateRange, findDistinct*, findLast()
+│   │       ├── mediaRepository.ts    # CRUD media_attachments, findByMemoryId, findByMemoryIds
+│   │       └── userRepository.ts     # CRUD telegram_users
 │   ├── services/
-│   │   ├── transcriptionService.ts   # Whisper API mit Detail-Prompt (Füllwörter, Lachen)
+│   │   ├── transcriptionService.ts   # Whisper-API-Call mit Detail-Prompt
 │   │   ├── summarizationService.ts   # GPT-4o-mini: summarize() + createWeeklySummary()
-│   │   ├── exifService.ts            # EXIF-GPS + Datum aus Bildern (ExifReader)
-│   │   ├── reminderService.ts        # Cron 20:00 Berlin: Reminder wenn heute keine Memory
-│   │   ├── fileCleanupService.ts     # Stündlich: temp/-Dateien > 2h löschen
-│   │   └── telegramSetupService.ts   # Bot-Befehle + Menü bei Telegram registrieren
+│   │   ├── exifService.ts            # GPS + Datum aus Foto-EXIF extrahieren
+│   │   ├── reminderService.ts        # Cron täglich 20:00: Reminder wenn heute keine Memory
+│   │   ├── fileCleanupService.ts     # Stündlich: verwaiste Dateien in uploads/ entfernen
+│   │   └── telegramSetupService.ts   # Bot-Befehle + Beschreibung bei Telegram registrieren
 │   ├── prompts/
-│   │   ├── summarizeMemory.prompt.md # Prompt: Transkript → JSON (child_name, people, categories, tags)
-│   │   └── weeklySummary.prompt.md   # Prompt: Einträge → Highlights, Themes, Summary
+│   │   ├── summarizeMemory.prompt.md # Haupt-KI-Prompt: Transkript → JSON
+│   │   └── weeklySummary.prompt.md   # KI-Prompt: Wochenrückblick
 │   └── jobs/
-│       └── weeklySummaryJob.ts       # (Nicht aktiv genutzt)
-├── web/                          # Frontend (eigenes package.json)
+│       └── weeklySummaryJob.ts       # Wochenzusammenfassung erstellen und versenden
+├── web/                          # Frontend (eigenes package.json + Vite-Build)
 │   ├── src/
-│   │   ├── main.tsx              # React Entry
-│   │   ├── App.tsx               # Auth-Check, Loading States, Error State → HomeScreen
-│   │   ├── index.css             # CSS Variables, Glassmorphism, Animationen (~1200 Zeilen)
-│   │   ├── types/index.ts        # Memory Interface, FAMILY_MEMBERS (mit Farben), CATEGORIES, LOCATIONS
-│   │   ├── api/memoriesApi.ts    # fetch-Wrapper mit Auth-Header + URL-Transform
+│   │   ├── main.tsx              # React-Einstiegspunkt
+│   │   ├── App.tsx               # Auth-Gate: Status prüfen → LoginScreen oder HomeScreen
+│   │   ├── index.css             # CSS Custom Properties, Glassmorphism, Animationen (~1200 Zeilen)
+│   │   ├── types/index.ts        # Memory-Interface, FAMILY_MEMBERS (mit Farben), CATEGORIES, LOCATIONS
+│   │   ├── api/memoriesApi.ts    # fetch-Wrapper für alle API-Calls + URL-Transformation
 │   │   └── components/
-│   │       ├── HomeScreen.tsx    # Hauptseite: Filter, Feed (Aktuelles + Fotos), Map-Tab (~850 Zeilen)
-│   │       ├── MapView.tsx       # Leaflet-Karte mit Marker-Clustering + Swipe-Carousel in Popups
-│   │       ├── MemoryCard.tsx    # Einzelne Erinnerungskarte (Fotos, Edit, Delete, Export, Lightbox)
-│   │       ├── FilterBar.tsx     # Family-Members + Kategorien-Filter (wird in HomeScreen inline gemacht)
-│   │       ├── Header.tsx        # Logo-Header (wird nicht direkt verwendet, Header ist in HomeScreen)
-│   │       ├── LoginScreen.tsx   # Passwort-Login
-│   │       ├── CreateMemoryModal.tsx  # Modal: Neue Erinnerung erstellen (Text, Person, Ort, Datum)
-│   │       ├── ExportCard.tsx    # Erinnerung als Bild exportieren (html2canvas)
-│   │       ├── CardGrid.tsx      # Grid-Layout für MemoryCards
-│   │       ├── TimelineView.tsx  # Timeline-Layout für Erinnerungen
+│   │       ├── HomeScreen.tsx    # Hauptseite: Filter, Grid, Timeline, Lightbox (~1300 Zeilen)
+│   │       ├── LoginScreen.tsx   # Passwort-Eingabe
+│   │       ├── MapView.tsx       # Leaflet-Karte mit Clustering und Popups
+│   │       ├── MemoryCard.tsx    # (Dead Code – wird nicht verwendet, tree-shaken)
+│   │       ├── CardGrid.tsx      # (Dead Code – wird nicht verwendet, tree-shaken)
+│   │       ├── FilterBar.tsx     # (Dead Code – wird nicht verwendet, tree-shaken)
+│   │       ├── TimelineView.tsx  # Timeline-Layout (in HomeScreen eingebunden)
+│   │       ├── Header.tsx        # App-Header
+│   │       ├── CreateMemoryModal.tsx  # Modal: Neue Erinnerung aus der Web-App erstellen
+│   │       ├── ExportCard.tsx    # Erinnerung als PNG exportieren (html2canvas)
 │   │       ├── EmptyState.tsx    # Leerer Zustand
 │   │       └── index.ts          # Re-exports
-│   └── package.json              # React 18, Leaflet, react-leaflet-cluster, date-fns, lucide-react
-├── data/                         # SQLite DB (memory.db)
-├── uploads/                      # Permanente Dateien (Fotos, Audio)
-├── temp/                         # Temporäre Audio-Dateien (für Transkription)
-├── package.json                  # Backend deps
-└── tsconfig.json                 # TypeScript Config
+│   └── dist/                     # Gebautes Frontend (im Git, wird von Express serviert)
+├── uploads/                      # Permanente Mediadateien (Fotos, Audio, Video) – NICHT im Git
+├── data/                         # SQLite-Datenbankdatei – NICHT im Git
+└── temp/                         # Temporäre Audio-Dateien für Transkription
 ```
 
-## Datenbank-Schema
+**Wichtig:** `web/dist/` ist im Git-Repository eingecheckt. Nach Änderungen am Frontend muss `cd web && npm run build` ausgeführt und das neue `dist/` committed werden – sonst sieht die Produktionsseite nichts von den Änderungen.
 
-### memory_entries (Haupttabelle)
-```sql
-id                INTEGER PRIMARY KEY AUTOINCREMENT
-created_at        TEXT DEFAULT datetime('now')
-source_date       TEXT NOT NULL              -- YYYY-MM-DD
-child_name        TEXT                       -- Hauptperson der Erinnerung (oder null)
-source_type       TEXT NOT NULL DEFAULT 'voice'  -- 'voice' | 'photo' | 'text' | 'web'
-source_message_id INTEGER NOT NULL
-telegram_chat_id  INTEGER NOT NULL
-raw_transcript    TEXT                       -- Originaltext / Transkript
-cleaned_summary   TEXT                       -- Bereinigter Text (Namen korrigiert)
-categories        TEXT                       -- JSON-Array: ["Familie", "Freizeit"]
-tags              TEXT                       -- JSON-Array: ["Spielplatz", "Lachen"]
-people            TEXT DEFAULT '[]'          -- JSON-Array: ["Junis", "Papa", "Eva"]
-importance_score  INTEGER                    -- 1-5
-transcript_status TEXT NOT NULL DEFAULT 'pending'   -- pending | completed | failed
-processing_status TEXT NOT NULL DEFAULT 'pending'   -- pending | summarized | failed
-error_message     TEXT
-recorded_by       TEXT                       -- "Mama", "Papa" etc.
-location          TEXT                       -- "Hamburg", "Zuhause" etc.
-is_favorite       INTEGER DEFAULT 0          -- 0 | 1
-latitude          REAL                       -- GPS
-longitude         REAL                       -- GPS
-```
+---
 
-### media_attachments
-```sql
-id                INTEGER PRIMARY KEY AUTOINCREMENT
-memory_entry_id   INTEGER NOT NULL REFERENCES memory_entries(id) ON DELETE CASCADE
-media_type        TEXT NOT NULL              -- 'photo' | 'audio' | 'video'
-telegram_file_id  TEXT NOT NULL
-local_path        TEXT                       -- Dateiname in uploads/
-created_at        TEXT DEFAULT datetime('now')
-```
+## Datenbankschema
 
-### telegram_users
-```sql
-id                INTEGER PRIMARY KEY AUTOINCREMENT
-telegram_chat_id  INTEGER NOT NULL UNIQUE
-display_name      TEXT NOT NULL              -- "Mama", "Papa" etc.
-created_at        TEXT DEFAULT datetime('now')
-```
+### `memory_entries` – Haupttabelle
+
+| Spalte | Typ | Beschreibung |
+|---|---|---|
+| `id` | INTEGER PK | Auto-increment |
+| `created_at` | TEXT | Erstellungszeitpunkt UTC (datetime('now')) |
+| `source_date` | TEXT | Datum des Erlebnisses (YYYY-MM-DD) |
+| `child_name` | TEXT | Hauptperson der Erinnerung: "Junis", "Noah" oder null |
+| `source_type` | TEXT | `voice` / `photo` / `video` / `text` / `web` |
+| `source_message_id` | INTEGER | Telegram Message-ID (0 bei Web-Einträgen) |
+| `telegram_chat_id` | INTEGER | Absender-Chat-ID (0 bei Web-Einträgen) |
+| `raw_transcript` | TEXT | Originaltext / Whisper-Transkript |
+| `cleaned_summary` | TEXT | KI-bereinigter Text (Namen normalisiert) |
+| `categories` | TEXT | JSON-Array, z.B. `["Familie","Gesundheit"]` |
+| `tags` | TEXT | JSON-Array mit Schlagwörtern |
+| `people` | TEXT | JSON-Array der explizit genannten Familienmitglieder |
+| `importance_score` | INTEGER | 1–5 (KI-Bewertung) |
+| `is_favorite` | INTEGER | 0 oder 1 |
+| `location` | TEXT | Ortsname, z.B. "Zuhause", "Spielplatz" |
+| `latitude` / `longitude` | REAL | GPS-Koordinaten (aus Foto-EXIF oder Standortnachricht) |
+| `recorded_by` | TEXT | Name des Aufzeichnenden, z.B. "Mama" |
+| `transcript_status` | TEXT | `pending` / `completed` / `failed` |
+| `processing_status` | TEXT | `pending` / `completed` / `failed` |
+| `error_message` | TEXT | Fehlermeldung bei gescheiterter Verarbeitung |
+
+### `media_attachments` – Mediadateien
+
+| Spalte | Beschreibung |
+|---|---|
+| `id` | Auto-increment PK |
+| `memory_entry_id` | FK → memory_entries (ON DELETE CASCADE) |
+| `media_type` | `photo` / `audio` / `video` |
+| `telegram_file_id` | Telegram-interner Dateischlüssel |
+| `local_path` | Dateiname in `uploads/` |
+
+### `telegram_users` – Registrierte Nutzer
+
+| Spalte | Beschreibung |
+|---|---|
+| `telegram_chat_id` | Primärschlüssel (UNIQUE) |
+| `display_name` | Zugewiesener Sprechername, z.B. "Mama" |
+
+### `weekly_summaries` – Wochenzusammenfassungen
+
+Speichert KI-generierte Wochenrückblicke mit `highlights`, `themes` und `weekly_summary` (JSON-Arrays / Text).
+
+### `migrations` – Migrationsprotokoll
+
+Verfolgt welche Migrationen bereits angewendet wurden.
 
 ### Indexes
-- `idx_memory_entries_source_date` (source_date)
-- `idx_memory_entries_chat_id` (telegram_chat_id)
-- `idx_memory_entries_favorite` (is_favorite)
-- `idx_memory_entries_coordinates` (latitude, longitude)
-- `idx_memory_entries_processing` (processing_status)
-- `idx_telegram_users_chat_id` (telegram_chat_id)
 
-## API Endpunkte
+- `source_date`, `telegram_chat_id`, `is_favorite`, `latitude/longitude`, `processing_status`
 
-### Auth (kein Auth-Header nötig)
-| Method | Route | Beschreibung |
-|--------|-------|-------------|
-| GET | `/api/auth/status` | Ob Passwort-Schutz aktiv ist |
-| POST | `/api/auth/login` | `{password}` → `{token}` |
-| POST | `/api/auth/verify` | `{token}` → `{valid: bool}` |
+---
 
-### Memories (Bearer-Token im Authorization-Header, wenn WEB_PASSWORD gesetzt)
-| Method | Route | Beschreibung |
-|--------|-------|-------------|
-| GET | `/api/memories?child=&category=&location=&favorites=true&search=&limit=100` | Alle (nur summarized) |
-| GET | `/api/memories/:id` | Einzelne Memory mit Attachments |
-| POST | `/api/memories` | Neue Memory aus Web `{text, child_name?, location?, source_date?}` |
-| PUT | `/api/memories/:id` | Text updaten `{cleaned_summary}` |
-| DELETE | `/api/memories/:id` | Löscht Memory + Medien |
-| POST | `/api/memories/:id/favorite` | Toggle Favorit `{is_favorite?}` |
-| GET | `/api/children` | Distinct child_names |
-| GET | `/api/locations` | Distinct locations |
+## API-Endpunkte
 
-### Webhook
-| Method | Route | Beschreibung |
-|--------|-------|-------------|
-| POST | `/webhook/telegram` | Telegram Updates empfangen |
-| GET | `/webhook/telegram` | Health Check |
+Alle `/api/*`-Endpunkte (außer `/api/auth/*`) sind durch `requireAuth` geschützt.
 
-### Rate Limits
-- Standard: 100 req / 15 min
-- Write-Ops: 50 req / 15 min
-- AI-Ops (POST /memories): 20 req / h
+### Auth (`/api/auth`)
 
-## Telegram Bot - Flow
+| Method | Pfad | Body / Response |
+|---|---|---|
+| `POST` | `/api/auth/login` | `{password}` → Session wird erstellt |
+| `POST` | `/api/auth/logout` | Session wird zerstört |
+| `GET` | `/api/auth/status` | `{passwordRequired: bool, authenticated: bool}` |
 
-### Sprachnachricht
-1. Voice Message empfangen → DB-Eintrag (pending)
-2. Audio temporär nach `temp/` herunterladen
-3. Whisper-Transkription (mit Detail-Prompt für Füllwörter)
-4. Buttons anzeigen: [Speichern] [Mit Audio] [Bearbeiten]
-5. Bei "Speichern": GPT-4o-mini Zusammenfassung → DB update (summarized)
-6. Bei "Mit Audio": Audio nach `uploads/` verschieben + media_attachment erstellen
-7. Bei "Bearbeiten": Warten auf korrigierten Text → dann wie Speichern
+### Erinnerungen
 
-### Foto
-1. Foto/Document empfangen → nach `uploads/` herunterladen
-2. EXIF extrahieren (nur bei Datei-Upload, nicht komprimiertes Foto)
-3. Wenn letzte Memory < 5 min: Foto dem letzten Eintrag zuordnen
-4. Sonst: Neuen Eintrag erstellen mit EXIF-Datum/GPS
-5. Bei komprimiertem Foto ohne EXIF: Tipp anzeigen (als Datei senden)
+| Method | Pfad | Beschreibung |
+|---|---|---|
+| `GET` | `/api/memories` | Alle Erinnerungen. Query: `child`, `category`, `location`, `favorites=true`, `search`, `limit` (1–1000, Standard 100) |
+| `GET` | `/api/memories/:id` | Einzelne Erinnerung mit Mediadateien |
+| `POST` | `/api/memories` | Neue Erinnerung aus Web (`{text, child_name?, location?, source_date?, people?}`) → löst KI aus |
+| `PUT` | `/api/memories/:id` | Text bearbeiten (`{cleaned_summary}`) |
+| `DELETE` | `/api/memories/:id` | Löscht Eintrag + alle zugehörigen Medien |
+| `POST` | `/api/memories/:id/favorite` | Favorit setzen/toggeln (`{is_favorite?}`) |
+| `POST` | `/api/memories/:id/photos` | Fotos hochladen (Multipart, max. 10 Dateien à 20 MB, nur `image/*`) |
+| `GET` | `/api/children` | Distinct Kindernamen aus DB |
+| `GET` | `/api/locations` | Distinct Orte aus DB |
 
-### Standort
-1. Location Message empfangen → Reverse Geocode (Nominatim)
-2. Im Chat-Speicher hinterlegen (für nächste Memory)
-3. Wenn letzte Memory < 10 min ohne Ort: Standort nachtragen
+### Sonstiges
 
-### Befehle
-- `/start` - Registrierung (Familienmitglied auswählen) oder Willkommen
-- `/record` - Anleitung zum Aufnehmen
-- `/letzte` - Letzte 5 summarized Entries
-- `/woche` - Wochenzusammenfassung via GPT-4o-mini
-- `/delete` - Letzten eigenen Eintrag löschen (mit Bestätigung)
-- `/werbinich` - Chat-ID + Registrierungsstatus
+| Pfad | Beschreibung |
+|---|---|
+| `GET /health` | Health-Check (kein Auth nötig) |
+| `POST /webhook/telegram` | Telegram-Webhook-Eingang |
+| `GET /uploads/:datei` | Statische Mediadateien |
+| `GET /*` | SPA-Fallback → `web/dist/index.html` |
 
-## Web Frontend - Aufbau
+### API-Antwortformat
 
-### App.tsx
-- Auth-Check: `/api/auth/status` → Token-Verify → LoginScreen oder HomeScreen
-- Token: 30 Tage gültig, in localStorage (`famories_auth_token`)
-- Share-Link: `?token=...` in URL für Oma & Opa
-
-### HomeScreen.tsx (Hauptkomponente, ~850 Zeilen)
-- **Tabs**: Feed | Karte
-- **Filter**: Person (Dropdown), Ort (Dropdown), Zeitraum (24h/7d/30d/Jahr/Custom), Favoriten, Suche
-- **Feed**: Zwei Spalten - "Aktuelles" (Text-Nachrichten) links, "Fotos" (Grid) rechts
-- **Inline-Edit**: Text direkt bearbeiten
-- **Inline-Delete**: Mit Bestätigung
-- **Accessibility**: Schriftgröße (normal/large/xlarge), High Contrast, in localStorage gespeichert
-
-### MapView.tsx
-- Leaflet + react-leaflet-cluster für Marker-Gruppierung
-- Memories mit gleichen Koordinaten (~100m) werden gruppiert
-- Popup: Swipe-Carousel mit Pfeilen + Dot-Indikatoren
-- Zeigt Foto, Datum, Person, Summary, Ort pro Item
-
-### MemoryCard.tsx
-- Photo-Grid (1-4 Fotos, Lightbox bei Klick)
-- Datum, Sterne (importance), Kind-Badge, Kategorien, Tags
-- Edit-Mode, Delete-Confirm, Export (html2canvas)
-
-## Familienmitglieder (Config)
-
-| Name | Aliases | Rolle |
-|------|---------|-------|
-| Junis | Juno, Jonas, Younes | Kind |
-| Noah | Fieti | Kind |
-| Mama | Leni, Lensi | Mutter |
-| Papa | Grabi, Michel | Vater |
-| Frank | Opa Frank | Opa (mütterl.) |
-| Eva | Oma Eva, Oma | Oma (mütterl.) |
-| Moma | - | Oma (väterl.) |
-| Opa Peter | Peter | Opa (väterl.) |
-| Bowie | - | Katze |
-
-**Achtung**: Diese Daten sind an 4 Stellen definiert:
-- `src/config/children.ts` (CHILDREN, FAMILY_MEMBERS, LOCATIONS)
-- `src/config/speakers.ts` (SPEAKERS mit Chat-IDs, PERSONS)
-- `src/bot/telegramWebhook.ts` (FAMILY_MEMBERS für Registrierung)
-- `web/src/types/index.ts` (FAMILY_MEMBERS mit Farben, LOCATIONS)
-
-## Kategorien
-Gesundheit, Schule, Familie, Freunde, Freizeit, Sport, Emotion, Entwicklung, Besonderes
-
-## Env-Variablen
-
-| Variable | Required | Default | Beschreibung |
-|----------|----------|---------|-------------|
-| TELEGRAM_BOT_TOKEN | Ja | - | Bot-Token von @BotFather |
-| OPENAI_API_KEY | Ja | - | Für Whisper + GPT-4o-mini |
-| PORT | Nein | 3000 | Server-Port |
-| DATABASE_PATH | Nein | ./data/memory.db | SQLite-Pfad |
-| WEB_PASSWORD | Nein | - | Wenn gesetzt: Passwort-Schutz für Web + API |
-| WEBHOOK_URL | Nein | - | Telegram Webhook URL |
-| ALLOWED_TELEGRAM_CHAT_IDS | Nein | - | Kommasepariert, leer = alle erlaubt |
-| GEMINI_API_KEY | Nein | - | Nicht aktiv genutzt |
-
-## Wichtige Patterns
-
-### Pendende Transkriptionen
-`pendingTranscriptions` Map in `telegramWebhook.ts` - lebt nur im RAM. Bei Restart gehen offene Transkriptionen verloren.
-
-### Chat-Standorte
-`chatLocations` Map - speichert letzten Standort pro Chat-ID, wird bei nächster Memory automatisch angewendet. Nur im RAM.
-
-### Foto-Zuordnung
-Fotos werden dem letzten Eintrag des gleichen Chats zugeordnet, wenn < 5 Minuten alt. Sonst neuer Eintrag.
-
-### Standort-Zuordnung
-Standort wird dem letzten Eintrag des gleichen Chats zugeordnet, wenn < 10 Minuten alt und noch kein Standort.
-
-### EXIF
-Nur bei Bildern die als Datei (nicht komprimiert) gesendet werden. Telegram-komprimierte Fotos verlieren EXIF. Extension-Check: .jpg, .jpeg, .tiff, .heic.
-
-### Auth-Flow
-1. Frontend prüft `/api/auth/status` → `passwordRequired`
-2. Wenn ja: Token aus localStorage oder URL-Parameter `?token=`
-3. Token = SHA256(password + 'famories-salt')
-4. API-Middleware `requireAuth`: Bearer-Token im Authorization-Header
-5. Wenn kein WEB_PASSWORD gesetzt: alles offen
-
-## Scripts
-
-```bash
-# Backend
-npm run dev          # tsx watch src/index.ts
-npm run build        # tsc
-npm run start        # node dist/index.js
-npm run migrate      # tsx src/db/migrate.ts
-npm run test         # vitest
-
-# Frontend (cd web/)
-npm run dev          # vite dev (port 5173)
-npm run build        # tsc + vite build
+```json
+{ "success": true, "data": { ... }, "count": 42 }
+{ "success": false, "error": "Fehlermeldung" }
 ```
 
-## Bekannte Limitierungen
+---
 
-1. **Speaker Chat-IDs**: Alle auf 0 in `speakers.ts` - müssen mit echten IDs befüllt werden
-2. **In-Memory State**: `pendingTranscriptions` und `chatLocations` überleben keinen Restart
-3. **Rate-Limiting pro IP**: Hinter NAT teilen sich alle ein Limit
-4. **Keine Pagination**: API gibt bis zu 1000 Einträge auf einmal zurück
-5. **Token im URL**: Share-Link enthält Token als Query-Parameter (Browser-History, Logs)
-6. **Duplizierte Configs**: Familienmitglieder an 4 Stellen definiert
+## Telegram Bot
+
+### Verarbeitete Nachrichtentypen
+
+| Typ | Ablauf |
+|---|---|
+| **Sprachnachricht** | Download → Whisper-Transkription → Bestätigungs-Buttons → GPT-4o-mini → DB |
+| **Text** | Direkt als Rohtext → GPT-4o-mini → DB |
+| **Foto** | Download → EXIF extrahieren → Zuordnung zu letztem Eintrag oder neuer Eintrag |
+| **Video-Notiz** (Kreis-Video) | Download → `media_attachment` anlegen |
+| **Standort** | GPS + Ortsname → an letzten Eintrag des Tages anhängen |
+
+### Bot-Befehle
+
+| Befehl | Funktion |
+|---|---|
+| `/start` | Nutzer registrieren (Familienmitglied auswählen) oder Willkommensnachricht |
+| `/record` | Aufnahme-Anleitung senden |
+| `/woche` | KI-generierten Wochenrückblick (alle Einträge der letzten 7 Tage) anfordern |
+| `/letzte` | Letzte summarized Erinnerung(en) anzeigen |
+| `/delete` | Letzten eigenen Eintrag löschen (mit Bestätigung) |
+| `/werbinich` | Eigene Chat-ID und registrierten Sprechernamen anzeigen |
+
+### Sicherheit im Bot
+
+- **Chat-ID-Whitelist**: `ALLOWED_CHAT_IDS` aus `.env` – Nachrichten von nicht erlaubten Chats werden still ignoriert
+- **Webhook-Secret**: Optionales `TELEGRAM_WEBHOOK_SECRET` – Telegram sendet es im `X-Telegram-Bot-Api-Secret-Token`-Header; der Bot prüft es
+
+### In-Memory-State (geht bei Restart verloren)
+
+- `pendingTranscriptions` Map: Offene Bestätigungs-Dialoge nach Transkription
+- `chatLocations` Map: Zuletzt gemeldeter Standort pro Chat-ID
+
+---
+
+## KI-Pipeline
+
+### Schritt 1 – Transkription (nur Sprachnotizen)
+
+- Telegram-Audio wird temporär in `temp/` gespeichert
+- OpenAI Whisper (`whisper-1`) transkribiert die Datei (Sprache: Deutsch)
+- Ergebnis wird als `raw_transcript` in der DB gespeichert
+
+### Schritt 2 – Zusammenfassung (alle Textquellen)
+
+GPT-4o-mini erhält das Transkript + den `summarizeMemory.prompt.md`-Prompt und gibt strukturiertes JSON zurück:
+
+```json
+{
+  "child_name": "Junis",
+  "people": ["Junis", "Oma Eva"],
+  "cleaned_summary": "Vollständiger bereinigter Originaltext...",
+  "categories": ["Gesundheit", "Familie"],
+  "tags": ["Ergotherapie", "Therapie"],
+  "importance_score": 3
+}
+```
+
+Das Ergebnis wird validiert (`validateResult()`), Kategorien gegen eine Allowlist geprüft, Personennamen normalisiert, und dann in der DB gespeichert.
+
+### Prompt-Regeln (summarizeMemory)
+
+1. Text vollständig zurückgeben – nur bekannte Spitznamen normalisieren (z.B. "Jonas" → "Junis")
+2. Nur explizit genannte Personen in `people` eintragen – keine Schlussfolgerungen
+3. Kategorien aus fester Liste (9 Optionen)
+4. Wichtigkeit 1–5 (1 = Alltag, 3 = normaler Moment, 5 = Meilenstein)
+
+### Bekannte Familienmitglieder (KI-Normalisierung)
+
+| Kanonischer Name | Aliases |
+|---|---|
+| Junis | Juno, Jonas (ACHTUNG: Jonas gibt es nicht – immer Junis!), Younes |
+| Noah | Noa |
+| Mama | Leni, Lensi |
+| Papa | Grabi, Michel |
+| Opa Frank | Opa (wenn nicht anders spezifiziert) |
+| Oma Eva | Oma (wenn nicht anders spezifiziert) |
+| Moma | – |
+| Opa Peter | Peter |
+| Bowie | – (Katze) |
+
+---
+
+## Sicherheit
+
+### Authentifizierung (Web-App)
+
+- **Passwortschutz** via `WEB_PASSWORD`-Env-Variable (optional – ohne Variable läuft alles offen)
+- **Session-basiert** via `express-session`:
+  - Cookie: `httpOnly: true`, `secure: true` in Production, `sameSite: 'none'` in Production
+  - Session-Laufzeit: 30 Tage
+  - Session-Secret: `SESSION_SECRET` aus Env-Variable
+- `requireAuth`-Middleware schützt alle `/api/*`-Endpunkte global (außer `/api/auth/*`)
+
+### Rate Limiting
+
+| Limiter | Grenze | Gilt für |
+|---|---|---|
+| Standard | 100 Requests / 15 min | Alle API-Endpunkte |
+| Write | 50 Requests / 15 min | PUT, DELETE, POST /favorite, POST /photos |
+| AI | 20 Requests / Stunde | POST /memories (löst KI-Verarbeitung aus) |
+
+### Eingabevalidierung (Zod)
+
+- Alle API-Request-Bodies, Query-Parameter und URL-Parameter werden mit Zod-Schemas geprüft
+- Textlängen begrenzt: max. 10.000 Zeichen (Inhalte), 200 (Suche), 100 (Namen)
+- Datumsformat strikt: `YYYY-MM-DD`
+- `limit`-Parameter geclampt auf 1–1000
+- Bei Validierungsfehler: HTTP 400 mit Fehlermeldung
+
+### CORS
+
+Nur diese Origins erlaubt:
+- `http://localhost:5173` / `5174` / `5175` / `3000` (Development)
+- `https://famories.info` / `https://www.famories.info` (Production)
+- `credentials: true` (für Cookies nötig)
+
+### Datei-Uploads (Multer)
+
+- Max. 20 MB pro Datei
+- Nur `image/*`-MIME-Types akzeptiert
+- Dateinamen server-seitig generiert: `web_<timestamp>_<random>.<ext>`
+
+---
+
+## Automatisierungen (Hintergrund-Jobs)
+
+### Täglicher Reminder (20:00 Uhr, Europe/Berlin)
+
+- Prüft ob heute bereits eine Erinnerung in der DB ist
+- Falls nicht: sendet sanfte Telegram-Nachricht an alle konfigurierten Chats
+- Kein Reminder wenn heute schon etwas gespeichert wurde
+
+### Stündlicher File-Cleanup
+
+- Sucht Dateien in `uploads/`, die keinen DB-Eintrag mehr haben
+- Löscht verwaiste Dateien (z.B. nach fehlgeschlagenem Upload)
+- Verhindert unbegrenztes Anwachsen des Upload-Verzeichnisses
+
+### Wöchentliche Zusammenfassung
+
+- Auf Anfrage per `/woche`-Befehl oder automatisch
+- GPT-4o-mini fasst alle Einträge der letzten 7 Tage zusammen
+- Output: `highlights` (Array), `themes` (Array), `weekly_summary` (Text)
+
+---
+
+## Web-App (Frontend)
+
+### Architektur
+
+- **SPA** (Single Page Application) – React, kein Server-Side Rendering
+- `App.tsx` prüft beim Start `/api/auth/status` → zeigt `LoginScreen` oder `HomeScreen`
+- `HomeScreen.tsx` ist die zentrale Komponente (~1300 Zeilen) und enthält die gesamte Hauptlogik
+
+### Ansichten (HomeScreen)
+
+| Tab | Beschreibung |
+|---|---|
+| **Grid** | Kachelansicht mit Fotos, Kategorien, Personen-Badges, Bearbeitungs- und Lösch-Funktion |
+| **Timeline** | Chronologische Listenansicht nach Datum gruppiert |
+| **Karte** | Leaflet-Karte mit GPS-Pins, Marker-Clustering, Popup-Carousel pro Standort |
+
+### Filter und Suche
+
+- **Kind**: Junis / Noah / alle
+- **Kategorie**: 9 Optionen (Gesundheit, Schule, Familie, Freunde, Freizeit, Sport, Emotion, Entwicklung, Besonderes)
+- **Ort**: Zuhause, Oma & Opa, Kita, Spielplatz, Urlaub, Unterwegs
+- **Personen**: Filter nach beliebigem Familienmitglied
+- **Nur Favoriten**: Stern-Filter
+- **Volltextsuche**: Durchsucht `cleaned_summary`, `tags`, `categories` (serverseitig)
+
+### Weitere Web-Funktionen
+
+- **Neue Erinnerung erstellen**: Modal mit Freitext, optionalem Kindname, Datum, Ort, Personen → KI-Zusammenfassung wird ausgelöst
+- **Text bearbeiten**: Inline-Editing per Klick auf den Text
+- **Favorit toggeln**: Stern-Icon pro Erinnerung
+- **Fotos hochladen**: direkt in eine bestehende Erinnerung
+- **Bild-Lightbox**: Vollbild via React Portal (kein Stacking-Context-Problem), natürliches Seitenverhältnis
+- **PNG-Export**: Einzelne Erinnerungen als Bild exportieren (html2canvas)
+
+### Design
+
+- Glassmorphism-Design mit CSS Custom Properties (`--color-*`, `--glass-*`, `--shadow-*`)
+- Jedes Familienmitglied hat eine feste Farbe (z.B. Junis = Blau #1e40af, Noah = Grün #425532)
+- Responsive, Mobile First
+- Animationen via CSS Keyframes (`animate-fade-in-scale`, `animate-fade-in`, usw.)
+
+---
+
+## Umgebungsvariablen
+
+| Variable | Pflicht | Beschreibung |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | Ja | Token von @BotFather |
+| `OPENAI_API_KEY` | Ja | Für Whisper + GPT-4o-mini |
+| `SESSION_SECRET` | Ja | Zufälliger String für Session-Verschlüsselung |
+| `DATABASE_PATH` | Nein | SQLite-Dateipfad (Standard: `./data/memories.db`) |
+| `PORT` | Nein | Server-Port (Standard: 3000) |
+| `NODE_ENV` | Nein | `production` aktiviert sichere Cookies |
+| `WEB_PASSWORD` | Nein | Passwort für Web-App (ohne Variable: offen) |
+| `TELEGRAM_WEBHOOK_SECRET` | Nein | Webhook-Validierungs-Token |
+| `ALLOWED_CHAT_IDS` | Nein | Komma-getrennte Telegram-Chat-IDs (leer = alle erlaubt) |
+
+---
+
+## Deployment & Build
+
+```bash
+# Backend starten
+npm run dev          # Entwicklung (tsx watch)
+npm start            # Produktion (node dist/index.js)
+npm run build        # TypeScript kompilieren
+npm run migrate      # Datenbankmigrationen ausführen
+
+# Frontend bauen (muss nach jeder Änderung an web/src/ gemacht werden!)
+cd web && npm run build   # → schreibt nach web/dist/
+# Danach: git add web/dist/ && git commit
+```
+
+**Request-Flow:**
+
+```
+Browser  → HTTPS GET/POST /api/*          → Express → requireAuth → API-Handler → SQLite
+Browser  → HTTPS GET /*                   → Express → web/dist/index.html (SPA)
+Telegram → HTTPS POST /webhook/telegram   → Express → Bot-Handler → SQLite + OpenAI
+Cron     → täglich 20:00                  → reminderService → Telegram-API
+```
+
+---
+
+## Bekannte Eigenheiten
+
+- **`web/dist/` im Git**: Änderungen am Frontend brauchen einen manuellen Build-Schritt + Commit
+- **In-Memory-State**: `pendingTranscriptions` und `chatLocations` gehen bei Server-Restart verloren
+- **Dead Code**: `MemoryCard.tsx`, `CardGrid.tsx`, `FilterBar.tsx` werden nicht importiert und vom Build tree-shaken
+- **Familienmitglieder an mehreren Stellen**: Definiert in `src/config/children.ts`, `src/config/speakers.ts`, `src/bot/telegramWebhook.ts` (für Bot-Registrierung) und `web/src/types/index.ts` (mit Farben für UI)
+- **Keine Pagination**: API gibt bis zu 1000 Einträge auf einmal zurück
+- **Rate-Limiting pro IP**: Hinter NAT teilen sich alle Nutzer ein Limit
