@@ -463,9 +463,11 @@ router.delete('/memories/:id/photos/:photoId', writeLimiter, validateParams(phot
     }
 
     // Datei von Disk löschen
-    const filePath = path.resolve('./uploads', attachment.local_path);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    if (attachment.local_path) {
+      const filePath = path.resolve('./uploads', attachment.local_path);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
     }
 
     mediaRepository.deleteById(photoId);
