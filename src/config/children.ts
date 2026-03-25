@@ -26,8 +26,8 @@ export const FAMILY_MEMBERS = [
   { name: 'Mama', aliases: ['mama', 'leni', 'lensi'] },
   { name: 'Papa', aliases: ['papa', 'grabi', 'michel'] },
   // Großeltern
-  { name: 'Frank', aliases: ['frank', 'opa frank'] },
-  { name: 'Eva', aliases: ['eva', 'oma eva', 'oma'] },
+  { name: 'Opa Frank', aliases: ['frank', 'opa frank', 'opa'] },
+  { name: 'Oma Eva', aliases: ['eva', 'oma eva', 'oma'] },
   { name: 'Moma', aliases: ['moma'] },
   { name: 'Opa Peter', aliases: ['opa peter', 'peter'] },
   // Haustiere

@@ -209,8 +209,8 @@ async function forwardGeocode(query: string): Promise<{ name: string; latitude: 
 const FAMILY_MEMBERS = [
   { name: 'Leni', displayName: 'Mama' },
   { name: 'Grabi', displayName: 'Papa' },
-  { name: 'Frank', displayName: 'Frank' },
-  { name: 'Eva', displayName: 'Eva' },
+  { name: 'Opa Frank', displayName: 'Opa Frank' },
+  { name: 'Oma Eva', displayName: 'Oma Eva' },
   { name: 'Moma', displayName: 'Moma' },
   { name: 'Opa Peter', displayName: 'Opa Peter' },
 ];

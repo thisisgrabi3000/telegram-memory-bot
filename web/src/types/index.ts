@@ -40,13 +40,13 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     color: { bg: '#e0e7ff', text: '#3730a3', activeBg: '#4f46e5' }, // Indigo
   },
   {
-    name: 'Frank',
-    aliases: ['Frank', 'Opa Frank'],
+    name: 'Opa Frank',
+    aliases: ['Opa Frank', 'Frank', 'Opa'],
     color: { bg: '#f9ecd0', text: '#a34a17', activeBg: '#dc8620' }, // Ocker
   },
   {
-    name: 'Eva',
-    aliases: ['Eva', 'Oma Eva', 'Oma'],
+    name: 'Oma Eva',
+    aliases: ['Oma Eva', 'Eva', 'Oma'],
     color: { bg: '#ede9fe', text: '#5b21b6', activeBg: '#7c3aed' }, // Violett
   },
   {
