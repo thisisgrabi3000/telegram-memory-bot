@@ -354,9 +354,7 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
         console.log(`Chat ${chatId} nicht erlaubt (${getAllowedChatCount()} Chats konfiguriert)`);
         await telegramService.sendMessage(
           chatId,
-          '❌ Dieser Chat ist nicht für den Bot autorisiert.\n\n' +
-          'Bitte kontaktiere den Administrator, um deinen Chat hinzuzufügen.\n' +
-          `Deine Chat-ID: ${chatId}`
+          'Dieser Bot ist privat.'
         );
         return;
       }
