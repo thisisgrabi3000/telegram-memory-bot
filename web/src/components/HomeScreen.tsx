@@ -19,6 +19,7 @@ interface HomeScreenProps {
   onDelete?: (id: number) => Promise<void>;
   onToggleFavorite?: (id: number) => Promise<void>;
   onCreate?: (data: { text: string; child_name?: string; location?: string; source_date?: string; people?: string[]; photos?: File[] }) => Promise<void>;
+  onDeletePhoto?: (memoryId: number, photoId: number) => Promise<void>;
 }
 
 type TimeFilter = '24h' | '7d' | '30d' | 'year' | 'custom';
@@ -73,7 +74,7 @@ const FONT_SIZE_CLASSES: Record<FontSize, string> = {
   xlarge: 'font-xlarge',
 };
 
-export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onCreate }: HomeScreenProps) {
+export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onCreate, onDeletePhoto }: HomeScreenProps) {
   const [personFilter, setPersonFilter] = useState<string>('Alle');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('7d');
   const [locationFilter, setLocationFilter] = useState<string>('Alle');
@@ -81,7 +82,9 @@ export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onC
   const [searchQuery, setSearchQuery] = useState('');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  const [lightboxImage, setLightboxImage] = useState<{ url: string; memory: Memory } | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; memory: Memory; photoId: number } | null>(null);
+  const [photoDeleteConfirm, setPhotoDeleteConfirm] = useState(false);
+  const [deletingPhoto, setDeletingPhoto] = useState(false);
   const [visibleImages, setVisibleImages] = useState(9);
 
   // Accessibility settings
@@ -230,7 +233,7 @@ export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onC
 
   // Get all photos from filtered memories
   const photoEntries = useMemo(() => {
-    const photos: { url: string; memory: Memory; date: string }[] = [];
+    const photos: { url: string; memory: Memory; date: string; photoId: number }[] = [];
     filteredMemories.forEach(memory => {
       if (memory.photos && memory.photos.length > 0) {
         memory.photos.forEach(photo => {
@@ -238,6 +241,7 @@ export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onC
             url: photo.url,
             memory,
             date: memory.source_date,
+            photoId: photo.id,
           });
         });
       }
@@ -1183,7 +1187,7 @@ export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onC
             padding: '1rem',
             gap: '1rem',
           }}
-          onClick={() => setLightboxImage(null)}
+          onClick={() => { setLightboxImage(null); setPhotoDeleteConfirm(false); }}
         >
           {/* Close button */}
           <button
@@ -1201,10 +1205,34 @@ export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onC
               alignItems: 'center',
               justifyContent: 'center',
             }}
-            onClick={() => setLightboxImage(null)}
+            onClick={() => { setLightboxImage(null); setPhotoDeleteConfirm(false); }}
           >
             <X className="w-6 h-6" style={{ color: '#1a1a1a' }} />
           </button>
+
+          {/* Delete button (only if onDeletePhoto is available) */}
+          {onDeletePhoto && (
+            <button
+              style={{
+                position: 'absolute',
+                top: '1.5rem',
+                left: '1.5rem',
+                padding: '0.75rem',
+                borderRadius: '1rem',
+                backgroundColor: photoDeleteConfirm ? 'rgba(220,38,38,0.9)' : 'rgba(255,255,255,0.95)',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background-color 0.2s',
+              }}
+              onClick={(e) => { e.stopPropagation(); setPhotoDeleteConfirm(v => !v); }}
+            >
+              <Trash2 className="w-6 h-6" style={{ color: photoDeleteConfirm ? 'white' : '#dc2626' }} />
+            </button>
+          )}
 
           {/* Image – natural aspect ratio, constrained to viewport */}
           <img
@@ -1266,6 +1294,39 @@ export function HomeScreen({ memories, onUpdate, onDelete, onToggleFavorite, onC
               <p style={{ marginTop: '0.75rem', fontSize: '0.8rem', lineHeight: 1.5, color: 'rgba(255,255,255,0.75)' }}>
                 {lightboxImage.memory.cleaned_summary}
               </p>
+            )}
+            {photoDeleteConfirm && onDeletePhoto && (
+              <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+                  Foto wirklich löschen?
+                </span>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    disabled={deletingPhoto}
+                    style={{ padding: '0.4rem 0.9rem', borderRadius: '0.6rem', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, backgroundColor: 'rgba(255,255,255,0.15)', color: 'white' }}
+                    onClick={(e) => { e.stopPropagation(); setPhotoDeleteConfirm(false); }}
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    disabled={deletingPhoto}
+                    style={{ padding: '0.4rem 0.9rem', borderRadius: '0.6rem', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, backgroundColor: '#dc2626', color: 'white', opacity: deletingPhoto ? 0.6 : 1 }}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      setDeletingPhoto(true);
+                      try {
+                        await onDeletePhoto(lightboxImage.memory.id, lightboxImage.photoId);
+                        setLightboxImage(null);
+                        setPhotoDeleteConfirm(false);
+                      } finally {
+                        setDeletingPhoto(false);
+                      }
+                    }}
+                  >
+                    {deletingPhoto ? 'Löschen...' : 'Löschen'}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>,

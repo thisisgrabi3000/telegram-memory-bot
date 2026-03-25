@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HomeScreen, LoginScreen } from './components';
-import { fetchMemories, updateMemory, deleteMemory, toggleFavorite, createMemory, uploadPhotos } from './api/memoriesApi';
+import { fetchMemories, updateMemory, deleteMemory, toggleFavorite, createMemory, uploadPhotos, deletePhoto } from './api/memoriesApi';
 import type { Memory } from './types';
 import { Loader2, Heart, RefreshCw, AlertTriangle } from 'lucide-react';
 
@@ -69,6 +69,11 @@ function App() {
   async function handleToggleFavorite(id: number) {
     const updated = await toggleFavorite(id);
     setMemories(prev => prev.map(m => m.id === id ? updated : m));
+  }
+
+  async function handleDeletePhoto(memoryId: number, photoId: number) {
+    const updated = await deletePhoto(memoryId, photoId);
+    setMemories(prev => prev.map(m => m.id === memoryId ? updated : m));
   }
 
   async function handleCreate(data: { text: string; child_name?: string; location?: string; source_date?: string; people?: string[]; photos?: File[] }) {
@@ -268,6 +273,7 @@ function App() {
       onDelete={handleDelete}
       onToggleFavorite={handleToggleFavorite}
       onCreate={handleCreate}
+      onDeletePhoto={handleDeletePhoto}
     />
   );
 }

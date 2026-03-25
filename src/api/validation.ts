@@ -84,6 +84,20 @@ export const idParamSchema = z.object({
 });
 
 /**
+ * Schema für Memory-ID + Photo-ID Parameter
+ */
+export const photoParamSchema = z.object({
+  id: z
+    .string()
+    .transform(val => parseInt(val, 10))
+    .refine(val => !isNaN(val) && val > 0, 'Ungültige ID'),
+  photoId: z
+    .string()
+    .transform(val => parseInt(val, 10))
+    .refine(val => !isNaN(val) && val > 0, 'Ungültige Photo-ID'),
+});
+
+/**
  * Middleware-Factory für Body-Validierung
  */
 export function validateBody<T extends z.ZodSchema>(schema: T) {

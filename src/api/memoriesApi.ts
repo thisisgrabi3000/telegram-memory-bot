@@ -2,6 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { memoryRepository } from '../db/repositories/memoryRepository';
 import { mediaRepository } from '../db/repositories/mediaRepository';
 import { summarizationService } from '../services/summarizationService';
@@ -12,6 +13,7 @@ import {
   favoriteSchema,
   memoriesQuerySchema,
   idParamSchema,
+  photoParamSchema,
   validateBody,
   validateQuery,
   validateParams,
@@ -439,6 +441,43 @@ router.post('/memories/:id/photos', writeLimiter, validateParams(idParamSchema),
   } catch (error) {
     console.error('API Error:', error);
     res.status(500).json({ success: false, error: 'Fehler beim Hochladen der Fotos' });
+  }
+});
+
+/**
+ * DELETE /api/memories/:id/photos/:photoId
+ * Löscht ein einzelnes Foto aus einer Erinnerung
+ */
+router.delete('/memories/:id/photos/:photoId', writeLimiter, validateParams(photoParamSchema), (req, res) => {
+  try {
+    const { id, photoId } = req.params as unknown as { id: number; photoId: number };
+
+    const memory = memoryRepository.findById(id);
+    if (!memory) {
+      return res.status(404).json({ success: false, error: 'Erinnerung nicht gefunden' });
+    }
+
+    const attachment = mediaRepository.findById(photoId);
+    if (!attachment || attachment.memory_entry_id !== id) {
+      return res.status(404).json({ success: false, error: 'Foto nicht gefunden' });
+    }
+
+    // Datei von Disk löschen
+    const filePath = path.resolve('./uploads', attachment.local_path);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    mediaRepository.deleteById(photoId);
+
+    const attachments = mediaRepository.findByMemoryId(id);
+    res.json({
+      success: true,
+      data: transformMemory(memory, attachments),
+    });
+  } catch (error) {
+    console.error('API Error:', error);
+    res.status(500).json({ success: false, error: 'Fehler beim Löschen des Fotos' });
   }
 });
 
