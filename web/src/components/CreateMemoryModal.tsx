@@ -86,11 +86,6 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!text.trim()) {
-      setError('Bitte gib einen Text ein');
-      return;
-    }
-
     setIsSubmitting(true);
     setError(null);
 
@@ -182,45 +177,6 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
           className="p-6 space-y-6 overflow-y-auto"
           style={{ flex: 1 }}
         >
-          {/* Text Input */}
-          <div>
-            <label
-              className="block text-sm font-bold mb-2.5"
-              style={{ color: 'var(--color-text-primary)' }}
-            >
-              Was möchtest du festhalten?
-            </label>
-            <div
-              className="relative rounded-2xl transition-all duration-300"
-              style={{
-                boxShadow: textFocused ? '0 0 0 4px rgba(232,107,63,0.1)' : 'none',
-              }}
-            >
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onFocus={() => setTextFocused(true)}
-                onBlur={() => setTextFocused(false)}
-                placeholder="Erzähle von einem schönen Moment..."
-                rows={4}
-                className="w-full px-4 py-4 rounded-2xl border-2 focus:outline-none transition-all duration-300 resize-none"
-                style={{
-                  backgroundColor: 'white',
-                  borderColor: textFocused ? 'var(--color-terracotta-400)' : 'var(--color-sand-200)',
-                  color: 'var(--color-text-primary)',
-                }}
-                autoFocus
-                disabled={isSubmitting}
-              />
-              <div
-                className="absolute bottom-3 right-3 text-xs"
-                style={{ color: 'var(--color-text-light)' }}
-              >
-                {text.length > 0 && `${text.length} Zeichen`}
-              </div>
-            </div>
-          </div>
-
           {/* Photo Upload */}
           <div>
             <label
@@ -272,6 +228,44 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
               <ImagePlus className="w-4 h-4" />
               {photos.length === 0 ? 'Fotos hinzufügen' : `${photos.length} Foto${photos.length > 1 ? 's' : ''} gewählt`}
             </button>
+          </div>
+
+          {/* Text Input */}
+          <div>
+            <label
+              className="block text-sm font-bold mb-2.5"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              Was ist passiert? <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(optional)</span>
+            </label>
+            <div
+              className="relative rounded-2xl transition-all duration-300"
+              style={{
+                boxShadow: textFocused ? '0 0 0 4px rgba(232,107,63,0.1)' : 'none',
+              }}
+            >
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onFocus={() => setTextFocused(true)}
+                onBlur={() => setTextFocused(false)}
+                placeholder="z.B. Junis erstes Tor heute..."
+                rows={3}
+                className="w-full px-4 py-4 rounded-2xl border-2 focus:outline-none transition-all duration-300 resize-none"
+                style={{
+                  backgroundColor: 'white',
+                  borderColor: textFocused ? 'var(--color-terracotta-400)' : 'var(--color-sand-200)',
+                  color: 'var(--color-text-primary)',
+                }}
+                disabled={isSubmitting}
+              />
+              <div
+                className="absolute bottom-3 right-3 text-xs"
+                style={{ color: 'var(--color-text-light)' }}
+              >
+                {text.length > 0 && `${text.length} Zeichen`}
+              </div>
+            </div>
           </div>
 
           {/* Person Selection — multi-select */}
@@ -413,13 +407,13 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !text.trim()}
+              disabled={isSubmitting}
               className="flex-1 flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-xl font-bold text-white transition-all duration-300 disabled:opacity-50 hover:scale-[1.02] hover:-translate-y-0.5"
               style={{
-                background: isSubmitting || !text.trim()
+                background: isSubmitting
                   ? 'linear-gradient(135deg, rgba(232,107,63,0.5) 0%, rgba(213,79,37,0.5) 100%)'
                   : 'linear-gradient(135deg, var(--color-terracotta-500) 0%, var(--color-terracotta-600) 50%, var(--color-rust-600) 100%)',
-                boxShadow: isSubmitting || !text.trim() ? 'none' : 'var(--shadow-glow-terracotta)',
+                boxShadow: isSubmitting ? 'none' : 'var(--shadow-glow-terracotta)',
               }}
             >
               {isSubmitting ? (

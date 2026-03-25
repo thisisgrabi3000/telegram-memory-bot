@@ -19,8 +19,9 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ungültiges Datumsfo
 export const createMemorySchema = z.object({
   text: z
     .string()
-    .min(1, 'Text darf nicht leer sein')
-    .max(MAX_TEXT_LENGTH, `Text darf maximal ${MAX_TEXT_LENGTH} Zeichen haben`),
+    .min(0)
+    .max(MAX_TEXT_LENGTH, `Text darf maximal ${MAX_TEXT_LENGTH} Zeichen haben`)
+    .default(''),
   child_name: z
     .string()
     .max(MAX_NAME_LENGTH)

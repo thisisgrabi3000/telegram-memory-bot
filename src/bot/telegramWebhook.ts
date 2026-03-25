@@ -28,6 +28,17 @@ interface PendingTranscription {
 const pendingTranscriptions = new Map<number, PendingTranscription>();
 
 /**
+ * Pending description requests after photo save (no caption).
+ * Key: chat_id, Value: pending data for description + follow-up location prompt
+ */
+interface PendingDescription {
+  memoryId: number;
+  needsLocation: boolean; // whether to ask for location after description
+  exifText: string;       // for confirmation message
+}
+const pendingDescriptionRequests = new Map<number, PendingDescription>();
+
+/**
  * Pending location requests after photo save.
  * Key: chat_id, Value: memory entry ID awaiting location
  */
@@ -254,7 +265,8 @@ function formatEntry(entry: {
  * Verarbeitet den /delete oder "lösche letzte" Befehl.
  */
 async function handleDelete(chatId: number): Promise<void> {
-  // Clear any pending location request for this chat
+  // Clear any pending requests for this chat
+  pendingDescriptionRequests.delete(chatId);
   pendingLocationRequests.delete(chatId);
 
   const lastEntry = memoryRepository.findLast(chatId);
@@ -530,6 +542,49 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
         return;
       }
 
+      // Check if awaiting a description for a photo
+      const pendingDesc = pendingDescriptionRequests.get(textMessage.chat_id);
+      if (pendingDesc !== undefined) {
+        pendingDescriptionRequests.delete(textMessage.chat_id);
+
+        const dText = textMessage.text.trim();
+        const isSkip = dText === '/skip' || dText.toLowerCase() === 'skip' || dText.toLowerCase() === 'überspringen';
+
+        if (!isSkip && dText.length > 0) {
+          try {
+            const summary = await summarizationService.summarize(dText);
+            memoryRepository.updateSummary(pendingDesc.memoryId, summary);
+            await telegramService.sendMessage(
+              textMessage.chat_id,
+              `📝 ${summary.cleaned_summary}`
+            );
+          } catch {
+            memoryRepository.updateSummary(pendingDesc.memoryId, {
+              child_name: null,
+              cleaned_summary: dText,
+              categories: [],
+              tags: [],
+              people: [],
+              importance_score: 3,
+            });
+            await telegramService.sendMessage(
+              textMessage.chat_id,
+              `📝 Beschreibung gespeichert: ${dText}`
+            );
+          }
+        }
+
+        // If no location yet, ask for it now
+        if (pendingDesc.needsLocation) {
+          pendingLocationRequests.set(textMessage.chat_id, pendingDesc.memoryId);
+          await telegramService.sendMessage(
+            textMessage.chat_id,
+            '📍 Wo wurde das aufgenommen? (Ort eingeben oder überspringen mit /skip)'
+          );
+        }
+        return;
+      }
+
       // Check if awaiting a location for a photo
       const pendingMemoryId = pendingLocationRequests.get(textMessage.chat_id);
       if (pendingMemoryId !== undefined) {
@@ -647,6 +702,20 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
           return;
         }
         case '/skip': {
+          const pendingDescSkip = pendingDescriptionRequests.get(command.chat_id);
+          if (pendingDescSkip !== undefined) {
+            pendingDescriptionRequests.delete(command.chat_id);
+            if (pendingDescSkip.needsLocation) {
+              pendingLocationRequests.set(command.chat_id, pendingDescSkip.memoryId);
+              await telegramService.sendMessage(
+                command.chat_id,
+                '📍 Wo wurde das aufgenommen? (Ort eingeben oder überspringen mit /skip)'
+              );
+            } else {
+              await telegramService.sendMessage(command.chat_id, '👍 Übersprungen.');
+            }
+            return;
+          }
           const pendingId = pendingLocationRequests.get(command.chat_id);
           if (pendingId !== undefined) {
             pendingLocationRequests.delete(command.chat_id);
@@ -855,7 +924,7 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
               );
             }
           } else {
-            // Foto ohne Caption: Markiere trotzdem als summarized
+            // Foto ohne Caption: Frage nach Beschreibung
             memoryRepository.updateSummary(entry.id, {
               child_name: null,
               cleaned_summary: '',
@@ -868,14 +937,15 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
               photoMessage.chat_id,
               `📷 Foto gespeichert!${exifText}`
             );
-          }
-
-          // Ask for location if no coordinates available
-          if (!exifCoords && !storedLocation) {
-            pendingLocationRequests.set(photoMessage.chat_id, entry.id);
+            // Ask for description first, then location if needed
+            pendingDescriptionRequests.set(photoMessage.chat_id, {
+              memoryId: entry.id,
+              needsLocation: !exifCoords && !storedLocation,
+              exifText,
+            });
             await telegramService.sendMessage(
               photoMessage.chat_id,
-              '📍 Wo wurde das aufgenommen? (Ort eingeben oder überspringen mit /skip)'
+              '✏️ Was ist passiert? (optional, /skip zum Überspringen)'
             );
           }
         }

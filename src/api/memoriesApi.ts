@@ -278,23 +278,35 @@ router.post('/memories', aiLimiter, validateBody(createMemorySchema), async (req
       recorded_by: 'Web App',
     });
 
-    try {
-      const summary = await summarizationService.summarize(text.trim());
+    if (text.trim()) {
+      try {
+        const summary = await summarizationService.summarize(text.trim());
 
-      // Merge AI-erkannte mit explizit gewählten Personen
-      const mergedPeople = [...new Set([...(summary.people || []), ...(explicitPeople || [])])];
+        // Merge AI-erkannte mit explizit gewählten Personen
+        const mergedPeople = [...new Set([...(summary.people || []), ...(explicitPeople || [])])];
 
-      memoryRepository.updateSummary(entry.id, {
-        ...summary,
-        // Explizit gewählter child_name hat Vorrang, sonst AI-Ergebnis
-        child_name: child_name !== undefined ? (child_name || null) : summary.child_name,
-        people: mergedPeople,
-      });
-    } catch (summaryError) {
-      console.error('Zusammenfassung fehlgeschlagen:', summaryError);
+        memoryRepository.updateSummary(entry.id, {
+          ...summary,
+          // Explizit gewählter child_name hat Vorrang, sonst AI-Ergebnis
+          child_name: child_name !== undefined ? (child_name || null) : summary.child_name,
+          people: mergedPeople,
+        });
+      } catch (summaryError) {
+        console.error('Zusammenfassung fehlgeschlagen:', summaryError);
+        memoryRepository.updateSummary(entry.id, {
+          child_name: child_name || null,
+          cleaned_summary: text.trim(),
+          categories: [],
+          tags: [],
+          people: explicitPeople || [],
+          importance_score: 3,
+        });
+      }
+    } else {
+      // Kein Text: direkt ohne KI-Zusammenfassung speichern
       memoryRepository.updateSummary(entry.id, {
         child_name: child_name || null,
-        cleaned_summary: text.trim(),
+        cleaned_summary: '',
         categories: [],
         tags: [],
         people: explicitPeople || [],
