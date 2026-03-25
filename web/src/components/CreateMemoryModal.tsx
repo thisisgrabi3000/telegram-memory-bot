@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
 import { X, User, MapPin, Calendar, Loader2, Sparkles, PenLine, Check, Camera, ImagePlus } from 'lucide-react';
 import { FAMILY_MEMBERS, LOCATIONS } from '../types';
+import { LocationAutocomplete } from './LocationAutocomplete';
+import type { LocationResult } from './LocationAutocomplete';
 
 const CHILDREN = ['Junis', 'Noah'];
 
@@ -13,6 +15,8 @@ interface CreateMemoryModalProps {
     source_date?: string;
     people?: string[];
     photos?: File[];
+    latitude?: number;
+    longitude?: number;
   }) => Promise<void>;
 }
 
@@ -21,6 +25,7 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [presetLocation, setPresetLocation] = useState('');
   const [customLocation, setCustomLocation] = useState('');
+  const [locationCoords, setLocationCoords] = useState<LocationResult | null>(null);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
@@ -40,11 +45,17 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
   function selectPresetLocation(name: string) {
     setPresetLocation(name === presetLocation ? '' : name);
     setCustomLocation('');
+    setLocationCoords(null);
   }
 
   function handleCustomLocationChange(val: string) {
     setCustomLocation(val);
     setPresetLocation('');
+    // locationCoords will be set/cleared via handleLocationSelect
+  }
+
+  function handleLocationSelect(result: LocationResult | null) {
+    setLocationCoords(result);
   }
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -94,6 +105,8 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
         source_date: date || undefined,
         people: selectedPeople.length > 0 ? selectedPeople : undefined,
         photos: photos.length > 0 ? photos : undefined,
+        latitude: locationCoords?.latitude,
+        longitude: locationCoords?.longitude,
       });
       // Cleanup previews
       photoPreviews.forEach(url => URL.revokeObjectURL(url));
@@ -337,17 +350,11 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
                 );
               })}
             </div>
-            <input
-              type="text"
+            <LocationAutocomplete
               value={customLocation}
-              onChange={(e) => handleCustomLocationChange(e.target.value)}
-              placeholder="Anderen Ort eingeben..."
-              className="w-full px-4 py-2.5 rounded-xl border-2 focus:outline-none transition-all duration-200 text-sm"
-              style={{
-                backgroundColor: 'white',
-                borderColor: customLocation ? 'var(--color-sage-400)' : 'var(--color-sand-200)',
-                color: 'var(--color-text-primary)',
-              }}
+              onChange={handleCustomLocationChange}
+              onSelect={handleLocationSelect}
+              placeholder="Ort eingeben..."
               disabled={isSubmitting}
             />
           </div>
