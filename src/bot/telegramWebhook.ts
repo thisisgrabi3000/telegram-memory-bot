@@ -28,6 +28,12 @@ interface PendingTranscription {
 const pendingTranscriptions = new Map<number, PendingTranscription>();
 
 /**
+ * Pending location requests after photo save.
+ * Key: chat_id, Value: memory entry ID awaiting location
+ */
+const pendingLocationRequests = new Map<number, number>();
+
+/**
  * Stored locations per chat (from Telegram location sharing).
  * Key: chat_id, Value: location data with name and coordinates
  */
@@ -160,6 +166,39 @@ async function reverseGeocode(lat: number, lon: number): Promise<string | null> 
     return address?.city || address?.town || address?.village || address?.municipality || null;
   } catch (error) {
     console.error('Reverse geocoding failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Forward geocode a text query to coordinates using Nominatim.
+ * Returns the first result, or null if not found.
+ */
+async function forwardGeocode(query: string): Promise<{ name: string; latitude: number; longitude: number } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&accept-language=de`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'TelegramMemoryBot/1.0' },
+    });
+    if (!response.ok) return null;
+
+    const results = await response.json() as Array<{
+      display_name: string;
+      lat: string;
+      lon: string;
+    }>;
+
+    if (!results || results.length === 0) return null;
+
+    const first = results[0];
+    const shortName = first.display_name.split(',')[0].trim();
+    return {
+      name: shortName,
+      latitude: parseFloat(first.lat),
+      longitude: parseFloat(first.lon),
+    };
+  } catch (error) {
+    console.error('Forward geocoding failed:', error);
     return null;
   }
 }
@@ -490,6 +529,39 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
         return;
       }
 
+      // Check if awaiting a location for a photo
+      const pendingMemoryId = pendingLocationRequests.get(textMessage.chat_id);
+      if (pendingMemoryId !== undefined) {
+        pendingLocationRequests.delete(textMessage.chat_id);
+
+        const lText = textMessage.text.trim();
+
+        // Allow skipping
+        if (lText === '/skip' || lText.toLowerCase() === 'skip' || lText.toLowerCase() === 'überspringen') {
+          await telegramService.sendMessage(textMessage.chat_id, '👍 Kein Ort gespeichert.');
+          return;
+        }
+
+        // Geocode the text
+        const geoResult = await forwardGeocode(lText);
+        if (geoResult) {
+          memoryRepository.updateLocation(pendingMemoryId, geoResult.name);
+          memoryRepository.updateCoordinates(pendingMemoryId, geoResult.latitude, geoResult.longitude);
+          await telegramService.sendMessage(
+            textMessage.chat_id,
+            `📍 Ort gespeichert: ${geoResult.name}`
+          );
+        } else {
+          // Save as text-only location (no coordinates)
+          memoryRepository.updateLocation(pendingMemoryId, lText);
+          await telegramService.sendMessage(
+            textMessage.chat_id,
+            `📍 Ort gespeichert: ${lText} (keine Koordinaten gefunden)`
+          );
+        }
+        return;
+      }
+
       const lowerText = textMessage.text.toLowerCase().trim();
       if (lowerText === 'lösche letzte' || lowerText === 'lösche letzten' || lowerText === 'letzten löschen') {
         await handleDelete(textMessage.chat_id);
@@ -784,6 +856,15 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
             await telegramService.sendMessage(
               photoMessage.chat_id,
               `📷 Foto gespeichert!${exifText}`
+            );
+          }
+
+          // Ask for location if no coordinates available
+          if (!exifCoords && !storedLocation) {
+            pendingLocationRequests.set(photoMessage.chat_id, entry.id);
+            await telegramService.sendMessage(
+              photoMessage.chat_id,
+              '📍 Wo wurde das aufgenommen? (Ort eingeben oder überspringen mit /skip)'
             );
           }
         }
