@@ -128,6 +128,8 @@ export interface CreateMemoryInput {
   location?: string;
   source_date?: string;
   people?: string[];
+  latitude?: number;
+  longitude?: number;
 }
 
 export async function createMemory(input: CreateMemoryInput): Promise<Memory> {

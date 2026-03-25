@@ -18,7 +18,16 @@ interface HomeScreenProps {
   onUpdate?: (id: number, text: string) => Promise<void>;
   onDelete?: (id: number) => Promise<void>;
   onToggleFavorite?: (id: number) => Promise<void>;
-  onCreate?: (data: { text: string; child_name?: string; location?: string; source_date?: string; people?: string[]; photos?: File[] }) => Promise<void>;
+  onCreate?: (data: {
+    text: string;
+    child_name?: string;
+    location?: string;
+    source_date?: string;
+    people?: string[];
+    photos?: File[];
+    latitude?: number;
+    longitude?: number;
+  }) => Promise<void>;
   onDeletePhoto?: (memoryId: number, photoId: number) => Promise<void>;
 }
 

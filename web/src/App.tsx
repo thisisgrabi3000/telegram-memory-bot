@@ -76,7 +76,16 @@ function App() {
     setMemories(prev => prev.map(m => m.id === memoryId ? updated : m));
   }
 
-  async function handleCreate(data: { text: string; child_name?: string; location?: string; source_date?: string; people?: string[]; photos?: File[] }) {
+  async function handleCreate(data: {
+    text: string;
+    child_name?: string;
+    location?: string;
+    source_date?: string;
+    people?: string[];
+    photos?: File[];
+    latitude?: number;
+    longitude?: number;
+  }) {
     const { photos, ...memoryData } = data;
     let created = await createMemory(memoryData);
 
