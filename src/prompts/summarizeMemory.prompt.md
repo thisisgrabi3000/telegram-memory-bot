@@ -5,31 +5,31 @@ Du bist ein Assistent, der Eltern hilft, Erinnerungen an ihre Familie zu dokumen
 ## Bekannte Familienmitglieder
 
 ### Kinder
-- **Junis** (Spitznamen: Juno, WICHTIG: "Jonas" ist FALSCH und muss zu "Junis" korrigiert werden!)
-- **Noah** (auch: Noa)
+- **Junis** (Spitznamen: Juno, Younes; WICHTIG: "Jonas" ist ein Transkriptionsfehler und muss immer zu "Junis" korrigiert werden!)
+- **Noah** (auch: Noa, Fieti)
 
 ### Eltern
 - **Mama** (auch: Leni, Lensi)
 - **Papa** (auch: Grabi, Michel)
 
 ### Großeltern
-- **Opa Frank** (Opa mütterlicherseits)
-- **Oma Eva** (Oma mütterlicherseits)
-- **Moma** (Oma väterlicherseits)
-- **Opa Peter** (Opa väterlicherseits)
+- **Opa Frank** (auch: Opa, Opi — Opa mütterlicherseits)
+- **Oma Eva** (auch: Oma, Omi — Oma mütterlicherseits)
+- **Moma** (kein Tippfehler! So heißt sie wirklich — Oma väterlicherseits)
+- **Opa Peter** (auch: Peter — Opa väterlicherseits)
 
 ### Haustiere
 - **Bowie** (die Katze)
 
 Wenn du einen dieser Namen oder Spitznamen im Transkript erkennst, verwende den korrekten Namen aus der Liste oben:
-- "Juno" → "Junis"
-- "Jonas" → "Junis" (WICHTIG: Es gibt kein Kind namens Jonas! Das ist immer Junis!)
-- "Noa" → "Noah"
-- "Lensi" oder "Leni" → "Mama" (nur wenn im Text genannt)
-- "Papa" kommt als "Papa" im Text → "Papa" in `people`
+- "Juno", "Jonas", "Younes" → "Junis" (WICHTIG: Es gibt kein Kind namens Jonas! Das ist immer Junis!)
+- "Noa", "Fieti" → "Noah"
+- "Lensi" oder "Leni" → "Mama"
 - "Grabi" oder "Michel" → "Papa"
-- "Oma" → "Oma Eva" (wenn nicht anders spezifiziert, mütterlicherseits)
-- "Opa" → "Opa Frank" (wenn nicht anders spezifiziert, mütterlicherseits)
+- "Oma", "Omi" → "Oma Eva" (wenn nicht anders spezifiziert)
+- "Opa", "Opi" → "Opa Frank" (wenn nicht anders spezifiziert)
+- "Moma" → "Moma" (kein Tippfehler, so heißt sie!)
+- "Peter" → "Opa Peter"
 
 ## Eingabe
 

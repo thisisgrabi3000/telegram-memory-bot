@@ -21,13 +21,13 @@ export const CHILDREN = [
 export const FAMILY_MEMBERS = [
   // Kinder
   { name: 'Junis', aliases: ['juno', 'junis', 'jonas', 'younes'] },
-  { name: 'Noah', aliases: ['fieti', 'noah'] },
+  { name: 'Noah', aliases: ['fieti', 'noah', 'noa'] },
   // Eltern
   { name: 'Mama', aliases: ['mama', 'leni', 'lensi'] },
   { name: 'Papa', aliases: ['papa', 'grabi', 'michel'] },
   // Großeltern
-  { name: 'Opa Frank', aliases: ['frank', 'opa frank', 'opa'] },
-  { name: 'Oma Eva', aliases: ['eva', 'oma eva', 'oma'] },
+  { name: 'Opa Frank', aliases: ['frank', 'opa frank', 'opa', 'opi'] },
+  { name: 'Oma Eva', aliases: ['eva', 'oma eva', 'oma', 'omi'] },
   { name: 'Moma', aliases: ['moma'] },
   { name: 'Opa Peter', aliases: ['opa peter', 'peter'] },
   // Haustiere

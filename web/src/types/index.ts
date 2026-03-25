@@ -26,7 +26,7 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
   },
   {
     name: 'Noah',
-    aliases: ['Noah'],
+    aliases: ['Noah', 'Noa', 'Fieti'],
     color: { bg: '#e6ebde', text: '#425532', activeBg: '#6b8a4f' }, // Salbeigrün
   },
   {
@@ -41,12 +41,12 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
   },
   {
     name: 'Opa Frank',
-    aliases: ['Opa Frank', 'Frank', 'Opa'],
+    aliases: ['Opa Frank', 'Frank', 'Opa', 'Opi'],
     color: { bg: '#f9ecd0', text: '#a34a17', activeBg: '#dc8620' }, // Ocker
   },
   {
     name: 'Oma Eva',
-    aliases: ['Oma Eva', 'Eva', 'Oma'],
+    aliases: ['Oma Eva', 'Eva', 'Oma', 'Omi'],
     color: { bg: '#ede9fe', text: '#5b21b6', activeBg: '#7c3aed' }, // Violett
   },
   {

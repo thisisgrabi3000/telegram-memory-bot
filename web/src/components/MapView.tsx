@@ -254,8 +254,8 @@ export function MapView({ memories }: MapViewProps) {
     [memoriesWithCoords]
   );
 
-  // Default center (Germany)
-  const defaultCenter: [number, number] = [51.1657, 10.4515];
+  // Default center (Lübeck)
+  const defaultCenter: [number, number] = [53.8655, 10.6866];
 
   // Calculate center from memories if available
   const center: [number, number] = memoriesWithCoords.length > 0
@@ -289,7 +289,7 @@ export function MapView({ memories }: MapViewProps) {
   return (
     <MapContainer
       center={center}
-      zoom={6}
+      zoom={10}
       style={{ height: '70vh', minHeight: '400px', width: '100%', borderRadius: '1rem' }}
     >
       <TileLayer
