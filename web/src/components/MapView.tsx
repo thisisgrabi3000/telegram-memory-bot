@@ -240,10 +240,13 @@ function LocationPopup({ memories }: { memories: Memory[] }) {
 }
 
 export function MapView({ memories }: MapViewProps) {
-  // Filter memories with valid coordinates
+  // Filter memories with valid, non-zero coordinates
   const memoriesWithCoords = useMemo(
     () => memories.filter(
-      (m) => typeof m.latitude === 'number' && typeof m.longitude === 'number'
+      (m) =>
+        typeof m.latitude === 'number' &&
+        typeof m.longitude === 'number' &&
+        (m.latitude !== 0 || m.longitude !== 0)
     ),
     [memories]
   );
@@ -254,16 +257,8 @@ export function MapView({ memories }: MapViewProps) {
     [memoriesWithCoords]
   );
 
-  // Default center (Lübeck)
+  // Always start centered on Lübeck – markers are still shown at their real positions
   const defaultCenter: [number, number] = [53.8655, 10.6866];
-
-  // Calculate center from memories if available
-  const center: [number, number] = memoriesWithCoords.length > 0
-    ? [
-        memoriesWithCoords.reduce((sum, m) => sum + (m.latitude || 0), 0) / memoriesWithCoords.length,
-        memoriesWithCoords.reduce((sum, m) => sum + (m.longitude || 0), 0) / memoriesWithCoords.length,
-      ]
-    : defaultCenter;
 
   if (memoriesWithCoords.length === 0) {
     return (
@@ -288,7 +283,7 @@ export function MapView({ memories }: MapViewProps) {
 
   return (
     <MapContainer
-      center={center}
+      center={defaultCenter}
       zoom={10}
       style={{ height: '70vh', minHeight: '400px', width: '100%', borderRadius: '1rem' }}
     >
