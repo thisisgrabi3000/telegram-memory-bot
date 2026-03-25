@@ -648,6 +648,14 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
           await telegramService.sendMessage(command.chat_id, message);
           return;
         }
+        case '/skip': {
+          const pendingId = pendingLocationRequests.get(command.chat_id);
+          if (pendingId !== undefined) {
+            pendingLocationRequests.delete(command.chat_id);
+            await telegramService.sendMessage(command.chat_id, '👍 Kein Ort gespeichert.');
+          }
+          return;
+        }
         default:
           await telegramService.sendMessage(
             command.chat_id,
@@ -751,6 +759,8 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
 
         if (lastEntry && new Date(lastEntry.created_at).getTime() > fiveMinutesAgo) {
           // Ordne dem letzten Eintrag zu
+          // Clear any pending location request since we're attaching to an existing entry
+          pendingLocationRequests.delete(photoMessage.chat_id);
           mediaRepository.create({
             memory_entry_id: lastEntry.id,
             media_type: 'photo',
