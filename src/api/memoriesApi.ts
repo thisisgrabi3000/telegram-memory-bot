@@ -255,12 +255,14 @@ router.put('/memories/:id', writeLimiter, validateParams(idParamSchema), validat
  */
 router.post('/memories', aiLimiter, validateBody(createMemorySchema), async (req, res) => {
   try {
-    const { text, child_name, location, source_date, people: explicitPeople } = req.body as {
+    const { text, child_name, location, source_date, people: explicitPeople, latitude, longitude } = req.body as {
       text: string;
       child_name?: string | null;
       location?: string | null;
       source_date?: string;
       people?: string[];
+      latitude?: number | null;
+      longitude?: number | null;
     };
 
     const date = source_date || new Date().toISOString().split('T')[0];
@@ -302,6 +304,10 @@ router.post('/memories', aiLimiter, validateBody(createMemorySchema), async (req
 
     if (location) {
       memoryRepository.updateLocation(entry.id, location);
+    }
+
+    if (latitude != null && longitude != null) {
+      memoryRepository.updateCoordinates(entry.id, latitude, longitude);
     }
 
     const updatedMemory = memoryRepository.findById(entry.id);

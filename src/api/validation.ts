@@ -36,6 +36,16 @@ export const createMemorySchema = z.object({
     .array(z.string().max(MAX_NAME_LENGTH))
     .max(20)
     .optional(),
+  latitude: z
+    .number()
+    .min(-90).max(90)
+    .optional()
+    .nullable(),
+  longitude: z
+    .number()
+    .min(-180).max(180)
+    .optional()
+    .nullable(),
 });
 
 /**
