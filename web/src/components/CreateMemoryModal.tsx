@@ -48,9 +48,20 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
   }
 
   function selectPresetLocation(name: string) {
-    setPresetLocation(name === presetLocation ? '' : name);
+    const isDeselecting = name === presetLocation;
+    setPresetLocation(isDeselecting ? '' : name);
     setCustomLocation('');
-    setLocationCoords(null);
+
+    if (isDeselecting) {
+      setLocationCoords(null);
+    } else {
+      const loc = LOCATIONS.find(l => l.name === name);
+      if (loc) {
+        setLocationCoords({ name: loc.name, latitude: loc.latitude, longitude: loc.longitude });
+      } else {
+        setLocationCoords(null);
+      }
+    }
   }
 
   function handleCustomLocationChange(val: string) {
@@ -407,6 +418,7 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
                     key={loc.name}
                     type="button"
                     onClick={() => selectPresetLocation(loc.name)}
+                    title={loc.address}
                     className="px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-105"
                     style={{
                       backgroundColor: active ? 'var(--color-sand-600)' : 'white',
