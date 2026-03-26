@@ -1197,3 +1197,50 @@ body {
   border: 2px solid #000000 !important;
   background: #ffffff !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MOBILE OPTIMIZATION - iPhone & Touch Devices
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Safe area insets for iPhone notch & home indicator */
+html {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* Prevent horizontal scroll */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Touch devices: show action buttons always (no hover) */
+@media (hover: none) and (pointer: coarse) {
+  .group .opacity-0.group-hover\:opacity-100 {
+    opacity: 1 !important;
+  }
+
+  /* Disable hover transforms on touch devices to prevent sticky hover states */
+  .glass-card:hover {
+    transform: none;
+  }
+
+  .hover-lift:hover {
+    transform: none;
+  }
+
+  /* Increase touch targets */
+  .filter-chip,
+  .member-chip {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* Small screens (iPhone SE, compact phones) */
+@media (max-width: 380px) {
+  .max-w-7xl {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}

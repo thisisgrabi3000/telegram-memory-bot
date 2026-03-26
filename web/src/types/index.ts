@@ -106,8 +106,6 @@ export interface Memory {
   longitude: number | null;
 }
 
-export type ViewMode = 'cards' | 'timeline';
-
 export const LOCATIONS = [
   { name: 'Zuhause', emoji: '🏠' },
   { name: 'Oma & Opa', emoji: '👵' },

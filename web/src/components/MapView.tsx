@@ -285,7 +285,7 @@ export function MapView({ memories }: MapViewProps) {
     <MapContainer
       center={defaultCenter}
       zoom={10}
-      style={{ height: '70vh', minHeight: '400px', width: '100%', borderRadius: '1rem' }}
+      style={{ height: '70vh', minHeight: '300px', width: '100%', borderRadius: '1rem' }}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

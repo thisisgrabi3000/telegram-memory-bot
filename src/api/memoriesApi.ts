@@ -12,7 +12,6 @@ import {
   updateMemorySchema,
   updateDateSchema,
   updatePersonSchema,
-  favoriteSchema,
   memoriesQuerySchema,
   idParamSchema,
   photoParamSchema,

@@ -314,7 +314,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                 <Heart className="w-5 h-5" style={{ color: highContrast ? '#ffffff' : 'var(--color-terracotta-500)', fill: highContrast ? '#ffffff' : 'var(--color-terracotta-500)' }} />
               </div>
               <h1
-                className="text-2xl sm:text-3xl font-bold gradient-text"
+                className="text-lg sm:text-2xl md:text-3xl font-bold gradient-text"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
                 Famories
@@ -322,10 +322,10 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 sm:gap-2">
               <button
                 onClick={() => setActiveTab('feed')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 min-w-[44px] min-h-[44px] px-3 sm:px-4 py-2 rounded-xl font-medium transition-all ${
                   activeTab === 'feed'
                     ? 'bg-gradient-to-r from-terracotta-500 to-terracotta-600 text-white'
                     : 'bg-white/50 hover:bg-white/80'
@@ -333,11 +333,11 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                 style={activeTab === 'feed' ? { boxShadow: 'var(--shadow-glow-terracotta)' } : {}}
               >
                 <List className="w-4 h-4" />
-                Feed
+                <span className="hidden sm:inline">Feed</span>
               </button>
               <button
                 onClick={() => setActiveTab('map')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 min-w-[44px] min-h-[44px] px-3 sm:px-4 py-2 rounded-xl font-medium transition-all ${
                   activeTab === 'map'
                     ? 'bg-gradient-to-r from-terracotta-500 to-terracotta-600 text-white'
                     : 'bg-white/50 hover:bg-white/80'
@@ -345,16 +345,16 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                 style={activeTab === 'map' ? { boxShadow: 'var(--shadow-glow-terracotta)' } : {}}
               >
                 <Map className="w-4 h-4" />
-                Karte
+                <span className="hidden sm:inline">Karte</span>
               </button>
             </div>
 
             {/* Right side buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {/* Help Button */}
               <button
                 onClick={() => setShowHelp(true)}
-                className="p-2.5 rounded-xl transition-all duration-200 hover:scale-105"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl transition-all duration-200 hover:scale-105"
                 style={{
                   backgroundColor: highContrast ? '#000000' : 'rgba(117,143,90,0.1)',
                 }}
@@ -367,7 +367,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
               <div className="relative">
                 <button
                   onClick={() => setShowSettings(!showSettings)}
-                  className="p-2.5 rounded-xl transition-all duration-200 hover:scale-105"
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl transition-all duration-200 hover:scale-105"
                   style={{
                     backgroundColor: highContrast ? '#000000' : 'rgba(146,122,94,0.1)',
                   }}
@@ -379,7 +379,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                 {/* Settings Dropdown */}
                 {showSettings && (
                   <div
-                    className="absolute right-0 top-full mt-2 w-64 rounded-2xl p-4 shadow-xl z-50 animate-fade-in"
+                    className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-64 max-w-[260px] rounded-2xl p-4 shadow-xl z-50 animate-fade-in"
                     style={{
                       backgroundColor: highContrast ? '#ffffff' : 'white',
                       border: highContrast ? '2px solid #000000' : '1px solid var(--color-sand-200)',
@@ -466,7 +466,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
               {onCreate && (
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="group flex items-center gap-2.5 px-5 py-3 rounded-2xl font-semibold text-white transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
+                  className="group flex items-center justify-center gap-2 sm:gap-2.5 min-w-[44px] min-h-[44px] px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl font-semibold text-white transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
                   style={{
                     background: highContrast ? '#000000' : 'linear-gradient(135deg, var(--color-terracotta-500) 0%, var(--color-terracotta-600) 50%, var(--color-rust-600) 100%)',
                     boxShadow: highContrast ? 'none' : 'var(--shadow-glow-terracotta)',
@@ -488,7 +488,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
         <div className="mb-6">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Search */}
-            <div className="flex-1 min-w-44 relative">
+            <div className="flex-1 min-w-[120px] sm:min-w-44 relative">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
                 style={{ color: searchQuery ? 'var(--color-terracotta-500)' : 'var(--color-text-muted)' }}
@@ -498,15 +498,16 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                 placeholder="Suchen…"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 rounded-xl text-sm font-medium focus:outline-none transition-all"
+                className="w-full pl-9 pr-8 py-2.5 rounded-xl text-sm font-medium focus:outline-none transition-all"
                 style={{
                   backgroundColor: 'white',
                   border: searchQuery ? '1.5px solid var(--color-terracotta-300)' : '1.5px solid var(--color-sand-200)',
                   color: 'var(--color-text-primary)',
+                  minHeight: '44px',
                 }}
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-100">
+                <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-gray-100" style={{ minWidth: '28px', minHeight: '28px' }}>
                   <X className="w-3.5 h-3.5" style={{ color: 'var(--color-text-muted)' }} />
                 </button>
               )}
@@ -516,8 +517,9 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
             <div className="relative">
               <button
                 onClick={(e) => { e.stopPropagation(); setShowFilterDropdown(v => !v); }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-105"
                 style={{
+                  minHeight: '44px',
                   backgroundColor: showFilterDropdown || (personFilter !== 'Alle' || locationFilter !== 'Alle' || timeFilter !== '7d') ? 'rgba(117,143,90,0.12)' : 'white',
                   border: '1.5px solid var(--color-sand-200)',
                   color: 'var(--color-text-primary)',
@@ -538,7 +540,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
               {/* Filter Dropdown */}
               {showFilterDropdown && (
                 <div
-                  className="absolute top-full mt-2 left-0 z-50 w-72 rounded-2xl shadow-2xl p-4 animate-fade-in"
+                  className="absolute top-full mt-2 right-0 sm:left-0 sm:right-auto z-50 w-[calc(100vw-2rem)] sm:w-72 max-w-[288px] rounded-2xl shadow-2xl p-4 animate-fade-in"
                   style={{
                     backgroundColor: 'white',
                     border: '1px solid var(--color-sand-200)',
@@ -556,7 +558,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                         <button
                           key={opt.value}
                           onClick={() => setTimeFilter(opt.value as TimeFilter)}
-                          className="px-2.5 py-1 rounded-full text-xs font-semibold transition-all"
+                          className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
                           style={{
                             backgroundColor: timeFilter === opt.value ? 'var(--color-terracotta-500)' : 'var(--color-sand-100)',
                             color: timeFilter === opt.value ? 'white' : 'var(--color-text-muted)',
@@ -636,8 +638,9 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
             {/* Favorites toggle */}
             <button
               onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-105"
               style={{
+                minHeight: '44px',
                 backgroundColor: showFavoritesOnly ? 'var(--color-amber-100)' : 'white',
                 border: showFavoritesOnly ? '1.5px solid var(--color-amber-300)' : '1.5px solid var(--color-sand-200)',
                 color: showFavoritesOnly ? 'var(--color-amber-700)' : 'var(--color-text-muted)',
@@ -658,14 +661,14 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
               <span className="flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold"
                 style={{ backgroundColor: 'rgba(117,143,90,0.12)', color: 'var(--color-sage-700)', border: '1px solid rgba(117,143,90,0.25)' }}>
                 👤 {personFilter}
-                <button onClick={() => setPersonFilter('Alle')} className="p-0.5 rounded-full hover:bg-sage-200 transition-all"><X className="w-3 h-3" /></button>
+                <button onClick={() => setPersonFilter('Alle')} className="p-1.5 -mr-0.5 rounded-full hover:bg-sage-200 transition-all"><X className="w-3 h-3" /></button>
               </span>
             )}
             {locationFilter !== 'Alle' && (
               <span className="flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold"
                 style={{ backgroundColor: 'rgba(146,122,94,0.1)', color: 'var(--color-sand-700)', border: '1px solid rgba(146,122,94,0.2)' }}>
                 📍 {locationFilter}
-                <button onClick={() => setLocationFilter('Alle')} className="p-0.5 rounded-full hover:bg-sand-200 transition-all"><X className="w-3 h-3" /></button>
+                <button onClick={() => setLocationFilter('Alle')} className="p-1.5 -mr-0.5 rounded-full hover:bg-sand-200 transition-all"><X className="w-3 h-3" /></button>
               </span>
             )}
 
@@ -878,7 +881,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                           {onToggleFavorite && !isEditing && !isDeleteConfirm && (
                             <button
                               onClick={() => onToggleFavorite(memory.id)}
-                              className="favorite-btn p-1.5 rounded-lg transition-all hover:bg-amber-50"
+                              className="favorite-btn min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg transition-all hover:bg-amber-50"
                               title={memory.is_favorite ? 'Favorit entfernen' : 'Als Favorit markieren'}
                             >
                               <Star
@@ -897,7 +900,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                               {onUpdate && (
                                 <button
                                   onClick={() => handleStartEdit(memory)}
-                                  className="p-1.5 rounded-lg transition-all hover:bg-white/80 hover:scale-110"
+                                  className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg transition-all hover:bg-white/80 hover:scale-110"
                                   title="Bearbeiten"
                                 >
                                   <Pencil className="w-3.5 h-3.5" style={{ color: 'var(--color-text-muted)' }} />
@@ -906,7 +909,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                               {onDelete && (
                                 <button
                                   onClick={() => setDeleteConfirmId(memory.id)}
-                                  className="p-1.5 rounded-lg transition-all hover:bg-red-50 hover:scale-110"
+                                  className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg transition-all hover:bg-red-50 hover:scale-110"
                                   title="Löschen"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" style={{ color: '#dc2626' }} />
@@ -1166,9 +1169,11 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
           <button
             style={{
               position: 'absolute',
-              top: '1.5rem',
-              right: '1.5rem',
+              top: 'max(1rem, env(safe-area-inset-top, 1rem))',
+              right: '1rem',
               padding: '0.75rem',
+              minWidth: '48px',
+              minHeight: '48px',
               borderRadius: '1rem',
               backgroundColor: 'rgba(255,255,255,0.95)',
               border: 'none',
@@ -1188,9 +1193,11 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
             <button
               style={{
                 position: 'absolute',
-                top: '1.5rem',
-                left: '1.5rem',
+                top: 'max(1rem, env(safe-area-inset-top, 1rem))',
+                left: '1rem',
                 padding: '0.75rem',
+                minWidth: '48px',
+                minHeight: '48px',
                 borderRadius: '1rem',
                 backgroundColor: photoDeleteConfirm ? 'rgba(220,38,38,0.9)' : 'rgba(255,255,255,0.95)',
                 border: 'none',
