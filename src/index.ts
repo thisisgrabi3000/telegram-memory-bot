@@ -8,6 +8,7 @@ import { validateEnv, env } from './config/env';
 import { telegramWebhook } from './bot/telegramWebhook';
 import { memoriesApi } from './api/memoriesApi';
 import { authApi } from './api/authApi';
+import { transcribeApi } from './api/transcribeApi';
 import { getDatabase, closeDatabase } from './db/client';
 import { initializeTelegramBot } from './services/telegramSetupService';
 import { startReminderScheduler, stopReminderScheduler } from './services/reminderService';
@@ -81,6 +82,7 @@ app.get('/health', (_req, res) => {
 // da memoriesApi requireAuth für alle /api/* Requests ausführt
 app.use('/api/auth', authApi);
 app.use('/api', memoriesApi);
+app.use('/api', transcribeApi);
 
 // Telegram Webhook unter /webhook/telegram
 app.use('/webhook', telegramWebhook);
