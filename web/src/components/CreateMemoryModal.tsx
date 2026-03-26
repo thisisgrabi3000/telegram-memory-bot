@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { X, User, MapPin, Calendar, Loader2, Sparkles, PenLine, Check, Camera, ImagePlus, Mic } from 'lucide-react';
 import { VoiceRecorder } from './VoiceRecorder';
 import { transcribeAudio } from '../api/memoriesApi';
+import exifr from 'exifr';
 import { FAMILY_MEMBERS, LOCATIONS } from '../types';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import type { LocationResult } from './LocationAutocomplete';
@@ -35,6 +36,7 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
   const [error, setError] = useState<string | null>(null);
   const [textFocused, setTextFocused] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [exifHint, setExifHint] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const location = customLocation.trim() || presetLocation;
@@ -61,7 +63,7 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
     setLocationCoords(result);
   }
 
-  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
@@ -78,6 +80,49 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
 
     // Reset input so same file can be re-selected
     e.target.value = '';
+
+    // Extract EXIF data from new files
+    const today = new Date().toISOString().split('T')[0];
+    let oldestDate: string | null = null;
+    let firstGps: { latitude: number; longitude: number } | null = null;
+
+    for (const file of files) {
+      try {
+        const exif = await exifr.parse(file, ['DateTimeOriginal', 'GPSLatitude', 'GPSLongitude']);
+        if (!exif) continue;
+
+        if (exif.DateTimeOriginal) {
+          const d = exif.DateTimeOriginal instanceof Date
+            ? exif.DateTimeOriginal
+            : new Date(exif.DateTimeOriginal);
+          if (!isNaN(d.getTime())) {
+            const dateStr = d.toISOString().split('T')[0];
+            if (!oldestDate || dateStr < oldestDate) oldestDate = dateStr;
+          }
+        }
+
+        if (!firstGps && exif.latitude != null && exif.longitude != null) {
+          firstGps = { latitude: exif.latitude, longitude: exif.longitude };
+        }
+      } catch {
+        // EXIF extraction failed for this file — skip silently
+      }
+    }
+
+    // Auto-fill date if it's still today (user hasn't manually changed it)
+    if (oldestDate && date === today) {
+      setDate(oldestDate);
+      setExifHint(`Datum aus Foto: ${oldestDate}`);
+    }
+
+    // Auto-fill GPS if no location manually selected
+    if (firstGps && !locationCoords && !presetLocation && !customLocation) {
+      setLocationCoords({
+        name: '',
+        latitude: firstGps.latitude,
+        longitude: firstGps.longitude,
+      });
+    }
   }
 
   function removePhoto(index: number) {
@@ -405,6 +450,11 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
               }}
               disabled={isSubmitting}
             />
+            {exifHint && (
+              <p className="text-xs mt-1.5" style={{ color: 'var(--color-sage-500)' }}>
+                {exifHint}
+              </p>
+            )}
           </div>
 
           {/* Error */}
@@ -423,7 +473,7 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
           )}
 
           {/* Submit */}
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-2" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
             <button
               type="button"
               onClick={onClose}

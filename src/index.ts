@@ -59,7 +59,7 @@ app.use(session({
 }));
 
 // JSON Body Parser für Telegram Webhooks
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // Stelle sicher, dass uploads-Verzeichnis existiert
 const uploadsDir = path.resolve('./uploads');

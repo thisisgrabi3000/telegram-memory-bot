@@ -46,9 +46,9 @@ const upload = multer({
       cb(null, `web_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
     },
   }),
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
   fileFilter: (_req, file, cb) => {
-    cb(null, file.mimetype.startsWith('image/'));
+    cb(null, file.mimetype.startsWith('image/') || file.mimetype.startsWith('audio/'));
   },
 });
 
