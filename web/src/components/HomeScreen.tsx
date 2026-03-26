@@ -84,7 +84,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
   const [lightboxImage, setLightboxImage] = useState<{ url: string; memory: Memory; photoId: number } | null>(null);
   const [photoDeleteConfirm, setPhotoDeleteConfirm] = useState(false);
   const [deletingPhoto, setDeletingPhoto] = useState(false);
-  const [visibleImages, setVisibleImages] = useState(9);
+  const [visibleImages, setVisibleImages] = useState(24);
 
   // Accessibility settings
   const [fontSize, setFontSize] = useState<FontSize>(() => {
@@ -676,8 +676,10 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
           </div>
         </div>
 
+        <div className="flex flex-col">
+
         {/* Aktuelles Section */}
-        <div className="mb-12">
+        <div className="mb-12" style={{ order: 2 }}>
           <div className="glass-card overflow-hidden">
               {/* Section Header */}
               <div
@@ -1023,7 +1025,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
         </div>
 
         {/* Bilder Section */}
-        <section className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
+        <section className="animate-fade-in mb-12" style={{ animationDelay: '0.2s', order: 1 }}>
           {/* Section Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
@@ -1072,95 +1074,35 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4 sm:gap-5">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-2.5">
                 {photoEntries.slice(0, visibleImages).map((photo, index) => {
-                  const authorName = photo.memory.recorded_by || 'Unbekannt';
-                  const authorColor = getMemberColor(authorName);
-                  const childName = photo.memory.child_name;
-
                   return (
                     <div
                       key={`${photo.memory.id}-${photo.url}`}
-                      className={`relative aspect-square rounded-2xl sm:rounded-3xl overflow-hidden cursor-pointer group animate-fade-in-up stagger-${(index % 10) + 1}`}
-                      style={{ boxShadow: 'var(--shadow-md)' }}
+                      className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer group animate-fade-in-up stagger-${(index % 10) + 1}`}
+                      style={{ boxShadow: 'var(--shadow-sm)' }}
                       onClick={() => setLightboxImage(photo)}
                     >
-                      {/* Actual Image */}
+                      {/* Image with zoom on hover */}
                       <img
                         src={photo.url}
                         alt=""
-                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700"
-                        style={{ transitionTimingFunction: 'var(--ease-out-expo)' }}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         loading="lazy"
                       />
 
-                      {/* Gradient overlay - always visible but subtle */}
-                      <div
-                        className="absolute inset-0 transition-opacity duration-500"
-                        style={{
-                          background: 'linear-gradient(to top, rgba(42,33,24,0.6) 0%, rgba(42,33,24,0.1) 40%, transparent 70%)',
-                          opacity: 0.6,
-                        }}
-                      />
-
                       {/* Hover overlay */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-500" />
-
-                      {/* Bottom info - always visible */}
-                      <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 transform translate-y-0 group-hover:-translate-y-1 transition-transform duration-500">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          {authorName !== 'Unbekannt' && (
-                            <span
-                              className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold backdrop-blur-sm"
-                              style={{
-                                backgroundColor: `${authorColor.activeBg}ee`,
-                                color: 'white',
-                              }}
-                            >
-                              {authorName}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-white/90 text-xs sm:text-sm font-medium">
-                          {format(parseISO(photo.date), 'd. MMM yyyy', { locale: de })}
-                        </span>
-                      </div>
-
-                      {/* Person Badge (if specific person) */}
-                      {childName && childName !== 'null' && (
-                        <div className="absolute top-3 left-3 transform group-hover:scale-105 transition-transform duration-300">
-                          <span
-                            className="px-2.5 py-1 rounded-lg text-xs font-bold backdrop-blur-md"
-                            style={{
-                              backgroundColor: 'rgba(255,255,255,0.9)',
-                              color: 'var(--color-text-primary)',
-                              boxShadow: 'var(--shadow-sm)',
-                            }}
-                          >
-                            {childName}
-                          </span>
-                        </div>
-                      )}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-all duration-300" />
 
                       {/* Favorite indicator */}
                       {photo.memory.is_favorite && (
-                        <div className="absolute top-3 right-3">
+                        <div className="absolute top-1 right-1">
                           <Star
-                            className="w-5 h-5 star-filled"
+                            className="w-3 h-3"
                             style={{ color: 'var(--color-amber-400)', fill: 'var(--color-amber-400)' }}
                           />
                         </div>
                       )}
-
-                      {/* Scale effect container */}
-                      <div className="absolute inset-0 group-hover:scale-110 transition-transform duration-700" style={{ transitionTimingFunction: 'var(--ease-out-expo)' }}>
-                        <img
-                          src={photo.url}
-                          alt=""
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      </div>
                     </div>
                   );
                 })}
@@ -1170,7 +1112,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
               {visibleImages < photoEntries.length && (
                 <div className="text-center mt-10">
                   <button
-                    onClick={() => setVisibleImages(prev => prev + 9)}
+                    onClick={() => setVisibleImages(prev => prev + 24)}
                     className="group inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105"
                     style={{
                       background: 'var(--glass-bg-strong)',
@@ -1193,6 +1135,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
             </>
           )}
         </section>
+        </div>{/* end flex-col sections wrapper */}
         </>) : (
           <div className="w-full" style={{ minHeight: 'calc(100vh - 200px)' }}>
             <MapView memories={filteredMemories} />
