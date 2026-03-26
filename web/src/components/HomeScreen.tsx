@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { format, parseISO, subDays, subHours, startOfYear, isWithinInterval } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -94,6 +94,15 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
     return localStorage.getItem('famories_high_contrast') === 'true';
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
+  // Close filter dropdown on outside click
+  useEffect(() => {
+    if (!showFilterDropdown) return;
+    const handler = () => setShowFilterDropdown(false);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [showFilterDropdown]);
   const [showHelp, setShowHelp] = useState(false);
 
   // Edit state
@@ -474,12 +483,202 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {activeTab === 'feed' ? (<>
-        {/* Filter & Aktuelles Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
 
-          {/* Aktuelles - Links */}
-          <div className="lg:col-span-1 order-2 lg:order-1">
-            <div className="glass-card overflow-hidden">
+        {/* Compact Filter Bar */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Search */}
+            <div className="flex-1 min-w-44 relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                style={{ color: searchQuery ? 'var(--color-terracotta-500)' : 'var(--color-text-muted)' }}
+              />
+              <input
+                type="text"
+                placeholder="Suchen…"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 rounded-xl text-sm font-medium focus:outline-none transition-all"
+                style={{
+                  backgroundColor: 'white',
+                  border: searchQuery ? '1.5px solid var(--color-terracotta-300)' : '1.5px solid var(--color-sand-200)',
+                  color: 'var(--color-text-primary)',
+                }}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-100">
+                  <X className="w-3.5 h-3.5" style={{ color: 'var(--color-text-muted)' }} />
+                </button>
+              )}
+            </div>
+
+            {/* Filter button */}
+            <div className="relative">
+              <button
+                onClick={() => setShowFilterDropdown(v => !v)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
+                style={{
+                  backgroundColor: showFilterDropdown || (personFilter !== 'Alle' || locationFilter !== 'Alle' || timeFilter !== '7d') ? 'rgba(117,143,90,0.12)' : 'white',
+                  border: '1.5px solid var(--color-sand-200)',
+                  color: 'var(--color-text-primary)',
+                }}
+              >
+                <SlidersHorizontal className="w-4 h-4" style={{ color: 'var(--color-sage-500)' }} />
+                <span className="hidden sm:inline">Filter</span>
+                {(personFilter !== 'Alle' || locationFilter !== 'Alle' || timeFilter !== '7d' && timeFilter !== 'all') && (
+                  <span
+                    className="flex items-center justify-center w-4 h-4 rounded-full text-xs font-bold text-white"
+                    style={{ backgroundColor: 'var(--color-terracotta-500)', fontSize: '10px' }}
+                  >
+                    {[personFilter !== 'Alle', locationFilter !== 'Alle', timeFilter !== '7d' && timeFilter !== 'all'].filter(Boolean).length}
+                  </span>
+                )}
+              </button>
+
+              {/* Filter Dropdown */}
+              {showFilterDropdown && (
+                <div
+                  className="absolute top-full mt-2 left-0 z-50 w-72 rounded-2xl shadow-2xl p-4 animate-fade-in"
+                  style={{
+                    backgroundColor: 'white',
+                    border: '1px solid var(--color-sand-200)',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06)',
+                  }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {/* Zeitraum */}
+                  <div className="mb-4">
+                    <label className="text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                      <Calendar className="w-3 h-3" /> Zeitraum
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {timeOptions.map(opt => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setTimeFilter(opt.value as TimeFilter)}
+                          className="px-2.5 py-1 rounded-full text-xs font-semibold transition-all"
+                          style={{
+                            backgroundColor: timeFilter === opt.value ? 'var(--color-terracotta-500)' : 'var(--color-sand-100)',
+                            color: timeFilter === opt.value ? 'white' : 'var(--color-text-muted)',
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    {timeFilter === 'custom' && (
+                      <div className="grid grid-cols-2 gap-2 mt-3">
+                        <div>
+                          <label className="text-xs text-muted mb-1 block" style={{ color: 'var(--color-text-muted)' }}>Von</label>
+                          <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-xl text-xs border focus:outline-none"
+                            style={{ borderColor: 'var(--color-sand-200)', color: 'var(--color-text-primary)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--color-text-muted)' }}>Bis</label>
+                          <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-xl text-xs border focus:outline-none"
+                            style={{ borderColor: 'var(--color-sand-200)', color: 'var(--color-text-primary)' }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Person */}
+                  <div className="mb-4">
+                    <label className="text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                      <User className="w-3 h-3" /> Person
+                    </label>
+                    <div className="relative">
+                      <select value={personFilter} onChange={e => setPersonFilter(e.target.value)}
+                        className="w-full appearance-none px-3 py-2 rounded-xl text-sm font-medium cursor-pointer focus:outline-none"
+                        style={{ backgroundColor: 'var(--color-sand-50)', border: '1.5px solid var(--color-sand-200)', color: 'var(--color-text-primary)' }}>
+                        {allPersons.map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
+                    </div>
+                  </div>
+
+                  {/* Ort */}
+                  <div className="mb-4">
+                    <label className="text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                      <MapPin className="w-3 h-3" /> Ort
+                    </label>
+                    <div className="relative">
+                      <select value={locationFilter} onChange={e => setLocationFilter(e.target.value)}
+                        className="w-full appearance-none px-3 py-2 rounded-xl text-sm font-medium cursor-pointer focus:outline-none"
+                        style={{ backgroundColor: 'var(--color-sand-50)', border: '1.5px solid var(--color-sand-200)', color: 'var(--color-text-primary)' }}>
+                        {allLocations.map(loc => (
+                          <option key={loc} value={loc === 'Alle' ? 'Alle' : loc.split(' ').slice(1).join(' ')}>{loc}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: 'var(--color-sand-200)' }}>
+                    <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      {filteredMemories.length} Erinnerungen
+                    </span>
+                    <button
+                      onClick={() => { setPersonFilter('Alle'); setLocationFilter('Alle'); setTimeFilter('7d'); setSearchQuery(''); setShowFavoritesOnly(false); setShowFilterDropdown(false); }}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-lg transition-all hover:bg-sand-100"
+                      style={{ color: 'var(--color-terracotta-500)' }}
+                    >
+                      Zurücksetzen
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Favorites toggle */}
+            <button
+              onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
+              style={{
+                backgroundColor: showFavoritesOnly ? 'var(--color-amber-100)' : 'white',
+                border: showFavoritesOnly ? '1.5px solid var(--color-amber-300)' : '1.5px solid var(--color-sand-200)',
+                color: showFavoritesOnly ? 'var(--color-amber-700)' : 'var(--color-text-muted)',
+              }}
+            >
+              <Star className="w-4 h-4" style={{ color: showFavoritesOnly ? 'var(--color-amber-500)' : undefined, fill: showFavoritesOnly ? 'var(--color-amber-500)' : 'none' }} />
+              <span className="hidden sm:inline">Favoriten</span>
+              {favoritesCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-xs font-bold"
+                  style={{ backgroundColor: showFavoritesOnly ? 'var(--color-amber-200)' : 'var(--color-sand-100)' }}>
+                  {favoritesCount}
+                </span>
+              )}
+            </button>
+
+            {/* Active filter chips */}
+            {personFilter !== 'Alle' && (
+              <span className="flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold"
+                style={{ backgroundColor: 'rgba(117,143,90,0.12)', color: 'var(--color-sage-700)', border: '1px solid rgba(117,143,90,0.25)' }}>
+                👤 {personFilter}
+                <button onClick={() => setPersonFilter('Alle')} className="p-0.5 rounded-full hover:bg-sage-200 transition-all"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {locationFilter !== 'Alle' && (
+              <span className="flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold"
+                style={{ backgroundColor: 'rgba(146,122,94,0.1)', color: 'var(--color-sand-700)', border: '1px solid rgba(146,122,94,0.2)' }}>
+                📍 {locationFilter}
+                <button onClick={() => setLocationFilter('Alle')} className="p-0.5 rounded-full hover:bg-sand-200 transition-all"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+
+            {/* Result count */}
+            <span className="text-xs ml-auto" style={{ color: 'var(--color-text-muted)' }}>
+              {filteredMemories.length} {filteredMemories.length === 1 ? 'Erinnerung' : 'Erinnerungen'}
+            </span>
+          </div>
+        </div>
+
+        {/* Aktuelles Section */}
+        <div className="mb-12">
+          <div className="glass-card overflow-hidden">
               {/* Section Header */}
               <div
                 className="px-5 py-4 flex items-center gap-3"
@@ -821,281 +1020,6 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                 )}
               </div>
             </div>
-          </div>
-
-          {/* Filter - Mitte & Rechts */}
-          <div className="lg:col-span-2 order-1 lg:order-2">
-            <div className="glass-card overflow-hidden">
-              {/* Filter Header */}
-              <div
-                className="px-5 py-4 flex items-center justify-between"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(117,143,90,0.06) 0%, rgba(148,171,120,0.06) 100%)',
-                  borderBottom: '1px solid rgba(255,255,255,0.5)',
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="p-2 rounded-xl"
-                    style={{ backgroundColor: 'rgba(117,143,90,0.1)' }}
-                  >
-                    <SlidersHorizontal className="w-5 h-5" style={{ color: 'var(--color-sage-500)' }} />
-                  </div>
-                  <h2
-                    className="text-lg font-bold"
-                    style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-display)' }}
-                  >
-                    Filter
-                  </h2>
-                </div>
-
-                {/* Favorites Toggle */}
-                <button
-                  onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 hover:scale-105 ${
-                    showFavoritesOnly ? 'ring-2 ring-offset-2' : ''
-                  }`}
-                  style={{
-                    backgroundColor: showFavoritesOnly ? 'var(--color-amber-100)' : 'white',
-                    color: showFavoritesOnly ? 'var(--color-amber-700)' : 'var(--color-text-muted)',
-                    boxShadow: showFavoritesOnly ? 'var(--shadow-glow-amber), 0 0 0 2px var(--color-amber-400), 0 0 0 4px white' : 'var(--shadow-sm)',
-                  }}
-                >
-                  <Star
-                    className={`w-4 h-4 transition-all ${showFavoritesOnly ? 'star-filled' : ''}`}
-                    style={{
-                      color: showFavoritesOnly ? 'var(--color-amber-500)' : undefined,
-                      fill: showFavoritesOnly ? 'var(--color-amber-500)' : 'none',
-                    }}
-                  />
-                  <span>Favoriten</span>
-                  {favoritesCount > 0 && (
-                    <span
-                      className="px-1.5 py-0.5 rounded-full text-xs font-bold"
-                      style={{
-                        backgroundColor: showFavoritesOnly ? 'var(--color-amber-200)' : 'var(--color-sand-200)',
-                      }}
-                    >
-                      {favoritesCount}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              <div className="p-5 space-y-5">
-                {/* Search Bar */}
-                <div className="relative">
-                  <div
-                    className="absolute left-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg"
-                    style={{ backgroundColor: searchQuery ? 'rgba(232,107,63,0.1)' : 'transparent' }}
-                  >
-                    <Search
-                      className="w-4 h-4 transition-colors"
-                      style={{ color: searchQuery ? 'var(--color-terracotta-500)' : 'var(--color-text-muted)' }}
-                    />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="In Erinnerungen suchen..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-14 pr-12 py-4 rounded-2xl text-sm font-medium transition-all duration-200 focus:outline-none"
-                    style={{
-                      backgroundColor: 'white',
-                      border: searchQuery ? '2px solid var(--color-terracotta-300)' : '2px solid var(--color-sand-200)',
-                      color: 'var(--color-text-primary)',
-                      boxShadow: searchQuery ? '0 0 0 4px rgba(232,107,63,0.08)' : 'none',
-                    }}
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-gray-100 transition-all hover:scale-110"
-                    >
-                      <X className="w-4 h-4" style={{ color: 'var(--color-text-muted)' }} />
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {/* Personen Filter */}
-                  <div>
-                    <label
-                      className="text-xs font-bold uppercase tracking-widest mb-2.5 flex items-center gap-2"
-                      style={{ color: 'var(--color-text-muted)' }}
-                    >
-                      <User className="w-3.5 h-3.5" />
-                      Person
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={personFilter}
-                        onChange={(e) => setPersonFilter(e.target.value)}
-                        className="w-full appearance-none px-4 py-3.5 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-terracotta-300"
-                        style={{
-                          backgroundColor: 'white',
-                          border: '2px solid var(--color-sand-200)',
-                          color: 'var(--color-text-primary)',
-                        }}
-                      >
-                        {allPersons.map(person => (
-                          <option key={person} value={person}>{person}</option>
-                        ))}
-                      </select>
-                      <ChevronDown
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 pointer-events-none transition-transform"
-                        style={{ color: 'var(--color-text-muted)' }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Location Filter */}
-                  <div>
-                    <label
-                      className="text-xs font-bold uppercase tracking-widest mb-2.5 flex items-center gap-2"
-                      style={{ color: 'var(--color-text-muted)' }}
-                    >
-                      <MapPin className="w-3.5 h-3.5" />
-                      Ort
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={locationFilter}
-                        onChange={(e) => setLocationFilter(e.target.value)}
-                        className="w-full appearance-none px-4 py-3.5 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-terracotta-300"
-                        style={{
-                          backgroundColor: 'white',
-                          border: '2px solid var(--color-sand-200)',
-                          color: 'var(--color-text-primary)',
-                        }}
-                      >
-                        {allLocations.map(loc => (
-                          <option key={loc} value={loc === 'Alle' ? 'Alle' : loc.split(' ').slice(1).join(' ')}>{loc}</option>
-                        ))}
-                      </select>
-                      <ChevronDown
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 pointer-events-none"
-                        style={{ color: 'var(--color-text-muted)' }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Zeitraum Filter */}
-                  <div>
-                    <label
-                      className="text-xs font-bold uppercase tracking-widest mb-2.5 flex items-center gap-2"
-                      style={{ color: 'var(--color-text-muted)' }}
-                    >
-                      <Calendar className="w-3.5 h-3.5" />
-                      Zeitraum
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={timeFilter}
-                        onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
-                        className="w-full appearance-none px-4 py-3.5 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-terracotta-300"
-                        style={{
-                          backgroundColor: 'white',
-                          border: '2px solid var(--color-sand-200)',
-                          color: 'var(--color-text-primary)',
-                        }}
-                      >
-                        {timeOptions.map(opt => (
-                          <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}</option>
-                        ))}
-                      </select>
-                      <ChevronDown
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 pointer-events-none"
-                        style={{ color: 'var(--color-text-muted)' }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Custom Date Range */}
-                  {timeFilter === 'custom' && (
-                    <div className="sm:col-span-3 grid grid-cols-2 gap-4 animate-slide-in-down">
-                      <div>
-                        <label
-                          className="text-xs font-medium mb-1.5 block"
-                          style={{ color: 'var(--color-text-muted)' }}
-                        >
-                          Von
-                        </label>
-                        <input
-                          type="date"
-                          value={customStartDate}
-                          onChange={(e) => setCustomStartDate(e.target.value)}
-                          className="w-full px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-terracotta-300"
-                          style={{
-                            backgroundColor: 'white',
-                            border: '2px solid var(--color-sand-200)',
-                            color: 'var(--color-text-primary)',
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label
-                          className="text-xs font-medium mb-1.5 block"
-                          style={{ color: 'var(--color-text-muted)' }}
-                        >
-                          Bis
-                        </label>
-                        <input
-                          type="date"
-                          value={customEndDate}
-                          onChange={(e) => setCustomEndDate(e.target.value)}
-                          className="w-full px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-terracotta-300"
-                          style={{
-                            backgroundColor: 'white',
-                            border: '2px solid var(--color-sand-200)',
-                            color: 'var(--color-text-primary)',
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Active Filter Summary */}
-                <div
-                  className="flex items-center justify-between pt-4 border-t"
-                  style={{ borderColor: 'var(--color-sand-200)' }}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <MessageCircle className="w-4 h-4" style={{ color: 'var(--color-terracotta-500)' }} />
-                      <span className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
-                        {textEntries.length}
-                      </span>
-                      <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Meldungen</span>
-                    </div>
-                    <div className="w-px h-4" style={{ backgroundColor: 'var(--color-sand-300)' }} />
-                    <div className="flex items-center gap-2">
-                      <Camera className="w-4 h-4" style={{ color: 'var(--color-sage-500)' }} />
-                      <span className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
-                        {photoEntries.length}
-                      </span>
-                      <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Fotos</span>
-                    </div>
-                  </div>
-                  {(personFilter !== 'Alle' || locationFilter !== 'Alle' || searchQuery || showFavoritesOnly) && (
-                    <button
-                      onClick={() => {
-                        setPersonFilter('Alle');
-                        setLocationFilter('Alle');
-                        setSearchQuery('');
-                        setShowFavoritesOnly(false);
-                      }}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:bg-white/80"
-                      style={{ color: 'var(--color-terracotta-500)' }}
-                    >
-                      Filter zurücksetzen
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Bilder Section */}
