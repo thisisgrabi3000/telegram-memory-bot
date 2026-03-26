@@ -6,12 +6,13 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, X, Calendar, User, MessageCircle, Image as ImageIcon,
   Pencil, Check, Trash2, Search, MapPin, Star, Plus, Mic, Heart,
   Sparkles, SlidersHorizontal, Camera, Settings, HelpCircle,
-  Type, Contrast, Link2, Map, List
+  Type, Contrast, Link2, Map, List, Clock
 } from 'lucide-react';
 import type { Memory } from '../types';
 import { FAMILY_MEMBERS, LOCATIONS } from '../types';
 import { CreateMemoryModal } from './CreateMemoryModal';
 import { MapView } from './MapView';
+import { HorizontalTimeline } from './HorizontalTimeline';
 
 interface HomeScreenProps {
   memories: Memory[];
@@ -131,7 +132,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'feed' | 'map'>('feed');
+  const [activeTab, setActiveTab] = useState<'feed' | 'map' | 'timeline'>('feed');
 
   // Lightbox navigation helpers
   function lightboxGoNext() {
@@ -369,6 +370,18 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
               >
                 <Map className="w-4 h-4" />
                 <span className="hidden sm:inline">Karte</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('timeline')}
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 min-w-[44px] min-h-[44px] px-3 sm:px-4 py-2 rounded-xl font-medium transition-all ${
+                  activeTab === 'timeline'
+                    ? 'bg-gradient-to-r from-terracotta-500 to-terracotta-600 text-white'
+                    : 'bg-white/50 hover:bg-white/80'
+                }`}
+                style={activeTab === 'timeline' ? { boxShadow: 'var(--shadow-glow-terracotta)' } : {}}
+              >
+                <Clock className="w-4 h-4" />
+                <span className="hidden sm:inline">Chronik</span>
               </button>
             </div>
 
@@ -1208,9 +1221,20 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
           )}
         </section>
         </div>{/* end flex-col sections wrapper */}
-        </>) : (
+        </>) : activeTab === 'map' ? (
           <div className="w-full" style={{ minHeight: 'calc(100vh - 200px)' }}>
             <MapView memories={filteredMemories} />
+          </div>
+        ) : (
+          <div style={{ width: '100%', height: 'calc(100vh - 200px)', minHeight: '300px' }}>
+            <HorizontalTimeline
+              memories={memories}
+              onOpenMemory={(memory, photoIndex) => {
+                if (memory.photos && memory.photos.length > 0) {
+                  setLightboxImage({ memory, photoIndex: photoIndex ?? 0 });
+                }
+              }}
+            />
           </div>
         )}
       </main>
