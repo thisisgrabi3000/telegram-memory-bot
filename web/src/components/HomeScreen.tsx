@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { format, parseISO, subDays, subHours, startOfYear, isWithinInterval } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
-  ChevronDown, X, Calendar, User, MessageCircle, Image as ImageIcon,
+  ChevronDown, ChevronLeft, ChevronRight, X, Calendar, User, MessageCircle, Image as ImageIcon,
   Pencil, Check, Trash2, Search, MapPin, Star, Plus, Mic, Heart,
   Sparkles, SlidersHorizontal, Camera, Settings, HelpCircle,
   Type, Contrast, Link2, Map, List
@@ -83,7 +83,8 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
   const [searchQuery, setSearchQuery] = useState('');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  const [lightboxImage, setLightboxImage] = useState<{ url: string; memory: Memory; photoId: number } | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ memory: Memory; photoIndex: number } | null>(null);
+  const [lightboxTouchStartX, setLightboxTouchStartX] = useState(0);
   const [photoDeleteConfirm, setPhotoDeleteConfirm] = useState(false);
   const [deletingPhoto, setDeletingPhoto] = useState(false);
   const [visibleImages, setVisibleImages] = useState(24);
@@ -131,6 +132,33 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'feed' | 'map'>('feed');
+
+  // Lightbox navigation helpers
+  function lightboxGoNext() {
+    if (!lightboxImage) return;
+    const total = lightboxImage.memory.photos.length;
+    if (total <= 1) return;
+    setLightboxImage({ memory: lightboxImage.memory, photoIndex: (lightboxImage.photoIndex + 1) % total });
+  }
+
+  function lightboxGoPrev() {
+    if (!lightboxImage) return;
+    const total = lightboxImage.memory.photos.length;
+    if (total <= 1) return;
+    setLightboxImage({ memory: lightboxImage.memory, photoIndex: (lightboxImage.photoIndex - 1 + total) % total });
+  }
+
+  // Keyboard handler for lightbox
+  useEffect(() => {
+    if (!lightboxImage) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'ArrowRight') lightboxGoNext();
+      else if (e.key === 'ArrowLeft') lightboxGoPrev();
+      else if (e.key === 'Escape') { setLightboxImage(null); setPhotoDeleteConfirm(false); }
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [lightboxImage]);
 
   // Accessibility handlers
   const handleFontSizeChange = (size: FontSize) => {
@@ -1189,6 +1217,10 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
 
       {/* Lightbox – via Portal to avoid stacking context clipping */}
       {lightboxImage && createPortal(
+        (() => {
+          const currentPhoto = lightboxImage.memory.photos[lightboxImage.photoIndex];
+          const totalPhotos = lightboxImage.memory.photos.length;
+          return (
         <div
           style={{
             position: 'fixed',
@@ -1205,6 +1237,12 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
             gap: '1rem',
           }}
           onClick={() => { setLightboxImage(null); setPhotoDeleteConfirm(false); }}
+          onTouchStart={(e) => setLightboxTouchStartX(e.touches[0].clientX)}
+          onTouchEnd={(e) => {
+            const delta = lightboxTouchStartX - e.changedTouches[0].clientX;
+            if (delta > 50) lightboxGoNext();
+            else if (delta < -50) lightboxGoPrev();
+          }}
         >
           {/* Close button */}
           <button
@@ -1255,9 +1293,80 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
             </button>
           )}
 
+          {/* Photo counter */}
+          {totalPhotos > 1 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'max(1rem, env(safe-area-inset-top, 1rem))',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'rgba(0,0,0,0.5)',
+                color: 'white',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                padding: '0.35rem 0.75rem',
+                borderRadius: '999px',
+                pointerEvents: 'none',
+              }}
+            >
+              {lightboxImage.photoIndex + 1} / {totalPhotos}
+            </div>
+          )}
+
+          {/* Prev button */}
+          {totalPhotos > 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); lightboxGoPrev(); }}
+              style={{
+                position: 'absolute',
+                left: '1rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'rgba(255,255,255,0.9)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '48px',
+                height: '48px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              }}
+            >
+              <ChevronLeft className="w-6 h-6" style={{ color: '#1a1a1a' }} />
+            </button>
+          )}
+
+          {/* Next button */}
+          {totalPhotos > 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); lightboxGoNext(); }}
+              style={{
+                position: 'absolute',
+                right: '1rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'rgba(255,255,255,0.9)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '48px',
+                height: '48px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              }}
+            >
+              <ChevronRight className="w-6 h-6" style={{ color: '#1a1a1a' }} />
+            </button>
+          )}
+
           {/* Image – natural aspect ratio, constrained to viewport */}
           <img
-            src={lightboxImage.url}
+            src={currentPhoto.url}
             alt=""
             style={{
               maxWidth: 'calc(100vw - 2rem)',
@@ -1394,7 +1503,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                       e.stopPropagation();
                       setDeletingPhoto(true);
                       try {
-                        await onDeletePhoto(lightboxImage.memory.id, lightboxImage.photoId);
+                        await onDeletePhoto(lightboxImage.memory.id, currentPhoto.id);
                         setLightboxImage(null);
                         setPhotoDeleteConfirm(false);
                       } finally {
@@ -1408,7 +1517,9 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
               </div>
             )}
           </div>
-        </div>,
+        </div>
+          );
+        })(),
         document.body
       )}
 
