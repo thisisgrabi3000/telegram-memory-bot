@@ -43,6 +43,7 @@ function groupByLocation(memories: Memory[]): Map<string, Memory[]> {
  */
 function LocationPopup({ memories }: { memories: Memory[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState(0);
 
   // Collect all photos from all memories in this group
   const allItems = useMemo(() => {
@@ -75,7 +76,15 @@ function LocationPopup({ memories }: { memories: Memory[] }) {
   };
 
   return (
-    <div style={{ minWidth: '240px', maxWidth: '300px' }}>
+    <div
+      style={{ minWidth: '240px', maxWidth: '300px' }}
+      onTouchStart={(e) => setTouchStartX(e.touches[0].clientX)}
+      onTouchEnd={(e) => {
+        const delta = touchStartX - e.changedTouches[0].clientX;
+        if (delta > 50 && currentIndex < allItems.length - 1) setCurrentIndex(i => i + 1);
+        else if (delta < -50 && currentIndex > 0) setCurrentIndex(i => i - 1);
+      }}
+    >
       {/* Image area with navigation */}
       <div className="relative" style={{ marginBottom: '8px' }}>
         {current.photo ? (
