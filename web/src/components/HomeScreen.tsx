@@ -251,22 +251,11 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
       .sort((a, b) => new Date(b.source_date).getTime() - new Date(a.source_date).getTime());
   }, [filteredMemories]);
 
-  // Get all photos from filtered memories
-  const photoEntries = useMemo(() => {
-    const photos: { url: string; memory: Memory; date: string; photoId: number }[] = [];
-    filteredMemories.forEach(memory => {
-      if (memory.photos && memory.photos.length > 0) {
-        memory.photos.forEach(photo => {
-          photos.push({
-            url: photo.url,
-            memory,
-            date: memory.source_date,
-            photoId: photo.id,
-          });
-        });
-      }
-    });
-    return photos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // One entry per memory (first photo as thumbnail)
+  const memoryPhotoGroups = useMemo(() => {
+    return filteredMemories
+      .filter(m => m.photos && m.photos.length > 0)
+      .sort((a, b) => new Date(b.source_date).getTime() - new Date(a.source_date).getTime());
   }, [filteredMemories]);
 
   const allPersons = ['Alle', ...FAMILY_MEMBERS.map(m => m.name)];
@@ -1078,7 +1067,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                   Fotogalerie
                 </h2>
                 <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                  {photoEntries.length} Erinnerungen festgehalten
+                  {memoryPhotoGroups.length} Erinnerungen mit Fotos
                 </p>
               </div>
             </div>
@@ -1090,7 +1079,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
             />
           </div>
 
-          {photoEntries.length === 0 ? (
+          {memoryPhotoGroups.length === 0 ? (
             <div className="glass-card p-16 text-center animate-fade-in">
               <div className="empty-illustration mx-auto mb-6">
                 <Camera className="w-14 h-14" style={{ color: 'var(--color-sand-400)' }} />
@@ -1108,17 +1097,19 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
           ) : (
             <>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-2.5">
-                {photoEntries.slice(0, visibleImages).map((photo, index) => {
+                {memoryPhotoGroups.slice(0, visibleImages).map((memory, index) => {
+                  const firstPhoto = memory.photos[0];
+                  const photoCount = memory.photos.length;
                   return (
                     <div
-                      key={`${photo.memory.id}-${photo.url}`}
+                      key={memory.id}
                       className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer group animate-fade-in-up stagger-${(index % 10) + 1}`}
                       style={{ boxShadow: 'var(--shadow-sm)' }}
-                      onClick={() => setLightboxImage(photo)}
+                      onClick={() => setLightboxImage({ memory, photoIndex: 0 })}
                     >
                       {/* Image with zoom on hover */}
                       <img
-                        src={photo.url}
+                        src={firstPhoto.url}
                         alt=""
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         loading="lazy"
@@ -1127,8 +1118,28 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                       {/* Hover overlay */}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-all duration-300" />
 
+                      {/* Photo count badge */}
+                      {photoCount > 1 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '4px',
+                            right: '4px',
+                            background: 'rgba(0,0,0,0.6)',
+                            color: 'white',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            padding: '2px 5px',
+                            borderRadius: '6px',
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          1/{photoCount} 📷
+                        </div>
+                      )}
+
                       {/* Favorite indicator */}
-                      {photo.memory.is_favorite && (
+                      {memory.is_favorite && (
                         <div className="absolute top-1 right-1">
                           <Star
                             className="w-3 h-3"
@@ -1142,7 +1153,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
               </div>
 
               {/* Load More Button */}
-              {visibleImages < photoEntries.length && (
+              {visibleImages < memoryPhotoGroups.length && (
                 <div className="text-center mt-10">
                   <button
                     onClick={() => setVisibleImages(prev => prev + 24)}
@@ -1160,7 +1171,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                       className="px-2 py-0.5 rounded-full text-sm"
                       style={{ backgroundColor: 'var(--color-sand-200)' }}
                     >
-                      {photoEntries.length - visibleImages}
+                      {memoryPhotoGroups.length - visibleImages}
                     </span>
                   </button>
                 </div>
