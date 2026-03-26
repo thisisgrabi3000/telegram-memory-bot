@@ -253,3 +253,26 @@ export async function searchMemories(query: string): Promise<Memory[]> {
 
   return json.data.map(transformMemoryUrls);
 }
+
+export async function transcribeAudio(audioBlob: Blob): Promise<string> {
+  const formData = new FormData();
+  formData.append('audio', audioBlob, 'recording.webm');
+
+  const response = await fetch(`${API_BASE_URL}/api/transcribe`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
+  }
+
+  const json = await response.json();
+
+  if (!json.success) {
+    throw new Error(json.error || 'Transkription fehlgeschlagen');
+  }
+
+  return json.data.text;
+}

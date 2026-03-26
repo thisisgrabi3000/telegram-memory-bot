@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react';
-import { X, User, MapPin, Calendar, Loader2, Sparkles, PenLine, Check, Camera, ImagePlus } from 'lucide-react';
+import { X, User, MapPin, Calendar, Loader2, Sparkles, PenLine, Check, Camera, ImagePlus, Mic } from 'lucide-react';
+import { VoiceRecorder } from './VoiceRecorder';
+import { transcribeAudio } from '../api/memoriesApi';
 import { FAMILY_MEMBERS, LOCATIONS } from '../types';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import type { LocationResult } from './LocationAutocomplete';
@@ -32,6 +34,7 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [textFocused, setTextFocused] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const location = customLocation.trim() || presetLocation;
@@ -93,8 +96,21 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
     const child_name = selectedPeople.find(p => CHILDREN.includes(p)) || undefined;
 
     try {
+      // Transcribe audio if present
+      let finalText = text.trim();
+      if (audioBlob) {
+        try {
+          const transcribed = await transcribeAudio(audioBlob);
+          finalText = finalText ? `${finalText}\n\n${transcribed}` : transcribed;
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Transkription fehlgeschlagen');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       await onCreate({
-        text: text.trim(),
+        text: finalText,
         child_name,
         location: location || undefined,
         source_date: date || undefined,
@@ -228,6 +244,21 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
               <ImagePlus className="w-4 h-4" />
               {photos.length === 0 ? 'Fotos hinzufügen' : `${photos.length} Foto${photos.length > 1 ? 's' : ''} gewählt`}
             </button>
+          </div>
+
+          {/* Voice Recording */}
+          <div>
+            <label
+              className="flex items-center gap-2 text-sm font-bold mb-3"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              <Mic className="w-4 h-4" style={{ color: 'var(--color-terracotta-500)' }} />
+              Sprachnotiz
+            </label>
+            <VoiceRecorder
+              onRecordingChange={setAudioBlob}
+              disabled={isSubmitting}
+            />
           </div>
 
           {/* Text Input */}
