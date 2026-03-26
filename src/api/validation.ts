@@ -67,6 +67,13 @@ export const updateDateSchema = z.object({
 });
 
 /**
+ * Schema für PATCH /memories/:id/person
+ */
+export const updatePersonSchema = z.object({
+  child_name: z.string().max(MAX_NAME_LENGTH).nullable(),
+});
+
+/**
  * Schema für POST /memories/:id/favorite
  */
 export const favoriteSchema = z.object({

@@ -11,6 +11,7 @@ import {
   createMemorySchema,
   updateMemorySchema,
   updateDateSchema,
+  updatePersonSchema,
   favoriteSchema,
   memoriesQuerySchema,
   idParamSchema,
@@ -277,6 +278,36 @@ router.patch('/memories/:id/date', writeLimiter, validateParams(idParamSchema), 
   } catch (error) {
     console.error('API Error:', error);
     res.status(500).json({ success: false, error: 'Fehler beim Aktualisieren des Datums' });
+  }
+});
+
+/**
+ * PATCH /api/memories/:id/person
+ * Aktualisiert die erkannte Person (child_name) einer Erinnerung
+ */
+router.patch('/memories/:id/person', writeLimiter, validateParams(idParamSchema), validateBody(updatePersonSchema), (req, res) => {
+  try {
+    const { id } = req.params as unknown as { id: number };
+    const { child_name } = req.body as { child_name: string | null };
+
+    const memory = memoryRepository.findById(id);
+    if (!memory) {
+      return res.status(404).json({ success: false, error: 'Erinnerung nicht gefunden' });
+    }
+
+    memoryRepository.updatePerson(id, child_name ?? null);
+
+    const updatedMemory = memoryRepository.findById(id);
+    const attachments = mediaRepository.findByMemoryId(id);
+
+    res.json({
+      success: true,
+      message: 'Person aktualisiert',
+      data: transformMemory(updatedMemory!, attachments),
+    });
+  } catch (error) {
+    console.error('API Error:', error);
+    res.status(500).json({ success: false, error: 'Fehler beim Aktualisieren der Person' });
   }
 });
 

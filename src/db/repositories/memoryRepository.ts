@@ -216,6 +216,16 @@ export const memoryRepository = {
   },
 
   /**
+   * Aktualisiert die erkannte Person (child_name) eines Eintrags
+   */
+  updatePerson(id: number, childName: string | null): boolean {
+    const db = getDatabase();
+    const stmt = db.prepare('UPDATE memory_entries SET child_name = ? WHERE id = ?');
+    const result = stmt.run(childName, id);
+    return result.changes > 0;
+  },
+
+  /**
    * Aktualisiert das Datum eines Eintrags
    */
   updateDate(id: number, date: string): boolean {

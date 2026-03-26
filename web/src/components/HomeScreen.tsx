@@ -17,6 +17,7 @@ interface HomeScreenProps {
   memories: Memory[];
   onUpdate?: (id: number, text: string) => Promise<void>;
   onUpdateDate?: (id: number, date: string) => Promise<void>;
+  onUpdatePerson?: (id: number, childName: string | null) => Promise<void>;
   onDelete?: (id: number) => Promise<void>;
   onToggleFavorite?: (id: number) => Promise<void>;
   onCreate?: (data: {
@@ -32,11 +33,13 @@ interface HomeScreenProps {
   onDeletePhoto?: (memoryId: number, photoId: number) => Promise<void>;
 }
 
-type TimeFilter = '24h' | '7d' | '30d' | 'year' | 'custom';
+type TimeFilter = '24h' | '7d' | '30d' | 'year' | 'custom' | 'all';
 
 function getTimeFilterRange(filter: TimeFilter, customStart?: string, customEnd?: string) {
   const now = new Date();
   switch (filter) {
+    case 'all':
+      return { start: new Date('1900-01-01'), end: new Date('2100-12-31') };
     case '24h':
       return { start: subHours(now, 24), end: now };
     case '7d':
@@ -70,7 +73,7 @@ const FONT_SIZE_CLASSES: Record<FontSize, string> = {
   xlarge: 'font-xlarge',
 };
 
-export function HomeScreen({ memories, onUpdate, onUpdateDate, onDelete, onToggleFavorite, onCreate, onDeletePhoto }: HomeScreenProps) {
+export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, onDelete, onToggleFavorite, onCreate, onDeletePhoto }: HomeScreenProps) {
   const [personFilter, setPersonFilter] = useState<string>('Alle');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('7d');
   const [locationFilter, setLocationFilter] = useState<string>('Alle');
@@ -102,6 +105,11 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onDelete, onToggl
   const [editingDateId, setEditingDateId] = useState<number | null>(null);
   const [editDateValue, setEditDateValue] = useState('');
   const [isSavingDate, setIsSavingDate] = useState(false);
+
+  // Person edit state
+  const [editingPersonId, setEditingPersonId] = useState<number | null>(null);
+  const [editPersonValue, setEditPersonValue] = useState<string>('');
+  const [isSavingPerson, setIsSavingPerson] = useState(false);
 
   // Delete state
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -254,6 +262,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onDelete, onToggl
   const allLocations = ['Alle', ...LOCATIONS.map(l => `${l.emoji} ${l.name}`)];
 
   const timeOptions = [
+    { value: 'all', label: 'Alle', icon: '🌐' },
     { value: '24h', label: 'Letzte 24h', icon: '⚡' },
     { value: '7d', label: '7 Tage', icon: '📅' },
     { value: '30d', label: '30 Tage', icon: '📆' },
@@ -527,16 +536,61 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onDelete, onToggl
                       >
                         {/* Header Row */}
                         <div className="flex items-center gap-2 mb-2.5 flex-wrap">
-                          {authorName !== 'Unbekannt' && (
+                          {editingPersonId === memory.id ? (
+                            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                              <select
+                                value={editPersonValue}
+                                onChange={e => setEditPersonValue(e.target.value)}
+                                className="text-xs px-2 py-1 rounded-lg border focus:outline-none"
+                                style={{ borderColor: 'var(--color-sand-300)', color: 'var(--color-text-primary)', backgroundColor: 'white' }}
+                                autoFocus
+                                disabled={isSavingPerson}
+                              >
+                                <option value="">Familie</option>
+                                {FAMILY_MEMBERS.map(m => (
+                                  <option key={m.name} value={m.name}>{m.name}</option>
+                                ))}
+                              </select>
+                              <button
+                                disabled={isSavingPerson}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!onUpdatePerson) return;
+                                  setIsSavingPerson(true);
+                                  try {
+                                    await onUpdatePerson(memory.id, editPersonValue || null);
+                                    setEditingPersonId(null);
+                                  } finally {
+                                    setIsSavingPerson(false);
+                                  }
+                                }}
+                                className="text-xs px-2 py-1 rounded-lg font-bold text-white disabled:opacity-50"
+                                style={{ backgroundColor: 'var(--color-sage-500)' }}
+                              >{isSavingPerson ? '...' : '✓'}</button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingPersonId(null); }}
+                                className="text-xs px-2 py-1 rounded-lg"
+                                style={{ backgroundColor: 'var(--color-sand-200)', color: 'var(--color-text-muted)' }}
+                              >✕</button>
+                            </div>
+                          ) : (
                             <span
                               className="px-2.5 py-1 rounded-full text-xs font-bold"
                               style={{
-                                backgroundColor: authorColor.activeBg,
-                                color: 'white',
-                                boxShadow: `0 2px 8px ${authorColor.activeBg}40`,
+                                backgroundColor: authorName !== 'Unbekannt' ? authorColor.activeBg : 'var(--color-sand-200)',
+                                color: authorName !== 'Unbekannt' ? 'white' : 'var(--color-text-muted)',
+                                boxShadow: authorName !== 'Unbekannt' ? `0 2px 8px ${authorColor.activeBg}40` : 'none',
+                                cursor: onUpdatePerson ? 'pointer' : 'default',
+                              }}
+                              title={onUpdatePerson ? 'Person ändern' : undefined}
+                              onClick={(e) => {
+                                if (!onUpdatePerson) return;
+                                e.stopPropagation();
+                                setEditPersonValue(memory.child_name || '');
+                                setEditingPersonId(memory.id);
                               }}
                             >
-                              {authorName}
+                              {authorName !== 'Unbekannt' ? authorName : '+ Person'}
                             </span>
                           )}
                           {/* Show people mentioned (excluding author) */}
@@ -582,6 +636,10 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onDelete, onToggl
                                   setIsSavingDate(true);
                                   try {
                                     await onUpdateDate(memory.id, editDateValue);
+                                    const newDate = parseISO(editDateValue);
+                                    if (timeFilter !== 'all' && !isWithinInterval(newDate, { start: timeRange.start, end: timeRange.end })) {
+                                      setTimeFilter('all');
+                                    }
                                     setEditingDateId(null);
                                   } finally {
                                     setIsSavingDate(false);
@@ -1360,6 +1418,10 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onDelete, onToggl
                         setIsSavingDate(true);
                         try {
                           await onUpdateDate(lightboxImage.memory.id, editDateValue);
+                          const newDate = parseISO(editDateValue);
+                          if (timeFilter !== 'all' && !isWithinInterval(newDate, { start: timeRange.start, end: timeRange.end })) {
+                            setTimeFilter('all');
+                          }
                           setEditingDateId(null);
                         } finally {
                           setIsSavingDate(false);

@@ -197,6 +197,23 @@ export async function deletePhoto(memoryId: number, photoId: number): Promise<Me
   return transformMemoryUrls(json.data);
 }
 
+export async function updateMemoryPerson(id: number, childName: string | null): Promise<Memory> {
+  const response = await fetch(`${API_BASE_URL}/api/memories/${id}/person`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ child_name: childName }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
+  }
+
+  const json: ApiResponse<RawMemory> = await response.json();
+  if (!json.success) throw new Error(json.error || 'Fehler beim Aktualisieren');
+  return transformMemoryUrls(json.data);
+}
+
 export async function updateMemoryDate(id: number, date: string): Promise<Memory> {
   const response = await fetch(`${API_BASE_URL}/api/memories/${id}/date`, {
     method: 'PATCH',
