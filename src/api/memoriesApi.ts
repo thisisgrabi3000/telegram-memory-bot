@@ -316,7 +316,7 @@ router.patch('/memories/:id/person', writeLimiter, validateParams(idParamSchema)
  */
 router.post('/memories', aiLimiter, validateBody(createMemorySchema), async (req, res) => {
   try {
-    const { text, child_name, location, source_date, people: explicitPeople, latitude, longitude } = req.body as {
+    const { text, child_name, location, source_date, people: explicitPeople, latitude, longitude, recorded_by } = req.body as {
       text: string;
       child_name?: string | null;
       location?: string | null;
@@ -324,6 +324,7 @@ router.post('/memories', aiLimiter, validateBody(createMemorySchema), async (req
       people?: string[];
       latitude?: number | null;
       longitude?: number | null;
+      recorded_by?: string;
     };
 
     const date = source_date || new Date().toISOString().split('T')[0];
@@ -336,7 +337,7 @@ router.post('/memories', aiLimiter, validateBody(createMemorySchema), async (req
       raw_transcript: text.trim(),
       transcript_status: 'completed',
       processing_status: 'pending',
-      recorded_by: 'Web App',
+      recorded_by: recorded_by || 'Web App',
     });
 
     if (text.trim()) {

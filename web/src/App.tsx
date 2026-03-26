@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { HomeScreen, LoginScreen } from './components';
+import { HomeScreen, LoginScreen, IdentityPicker } from './components';
 import { fetchMemories, updateMemory, updateMemoryDate, updateMemoryPerson, deleteMemory, toggleFavorite, createMemory, uploadPhotos, deletePhoto } from './api/memoriesApi';
 import type { Memory } from './types';
 import { Loader2, Heart, RefreshCw, AlertTriangle } from 'lucide-react';
@@ -12,6 +12,9 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [identity, setIdentity] = useState<string | null>(() =>
+    localStorage.getItem('famories_identity')
+  );
 
   // Check authentication on mount
   useEffect(() => {
@@ -39,6 +42,16 @@ function App() {
 
   function handleLogin() {
     setIsAuthenticated(true);
+  }
+
+  function handleIdentitySelect(name: string) {
+    localStorage.setItem('famories_identity', name);
+    setIdentity(name);
+  }
+
+  function handleIdentityReset() {
+    localStorage.removeItem('famories_identity');
+    setIdentity(null);
   }
 
   async function loadMemories() {
@@ -97,7 +110,7 @@ function App() {
     longitude?: number;
   }) {
     const { photos, ...memoryData } = data;
-    let created = await createMemory(memoryData);
+    let created = await createMemory({ ...memoryData, recorded_by: identity || undefined });
 
     if (photos && photos.length > 0) {
       created = await uploadPhotos(created.id, photos);
@@ -157,6 +170,11 @@ function App() {
   // Not authenticated - show login
   if (!isAuthenticated) {
     return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  // No identity selected - show identity picker
+  if (!identity) {
+    return <IdentityPicker onSelect={handleIdentitySelect} />;
   }
 
   // Loading memories - Premium loading state
@@ -295,6 +313,8 @@ function App() {
       onToggleFavorite={handleToggleFavorite}
       onCreate={handleCreate}
       onDeletePhoto={handleDeletePhoto}
+      identity={identity}
+      onIdentityReset={handleIdentityReset}
     />
   );
 }

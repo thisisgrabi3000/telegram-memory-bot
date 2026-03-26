@@ -130,6 +130,7 @@ export interface CreateMemoryInput {
   people?: string[];
   latitude?: number;
   longitude?: number;
+  recorded_by?: string;
 }
 
 export async function createMemory(input: CreateMemoryInput): Promise<Memory> {

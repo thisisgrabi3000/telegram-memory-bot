@@ -31,6 +31,8 @@ interface HomeScreenProps {
     longitude?: number;
   }) => Promise<void>;
   onDeletePhoto?: (memoryId: number, photoId: number) => Promise<void>;
+  identity?: string | null;
+  onIdentityReset?: () => void;
 }
 
 type TimeFilter = '24h' | '7d' | '30d' | 'year' | 'custom' | 'all';
@@ -73,7 +75,7 @@ const FONT_SIZE_CLASSES: Record<FontSize, string> = {
   xlarge: 'font-xlarge',
 };
 
-export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, onDelete, onToggleFavorite, onCreate, onDeletePhoto }: HomeScreenProps) {
+export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, onDelete, onToggleFavorite, onCreate, onDeletePhoto, identity, onIdentityReset }: HomeScreenProps) {
   const [personFilter, setPersonFilter] = useState<string>('Alle');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('7d');
   const [locationFilter, setLocationFilter] = useState<string>('Alle');
@@ -450,6 +452,30 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                       <Link2 className="w-4 h-4" />
                       Link für Oma & Opa kopieren
                     </button>
+
+                    {/* Identity */}
+                    {onIdentityReset && identity && (
+                      <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--color-sand-200)' }}>
+                        <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: highContrast ? '#000000' : 'var(--color-text-muted)' }}>
+                          Angemeldet als
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm" style={{ color: highContrast ? '#000000' : 'var(--color-text-primary)' }}>
+                            {identity}
+                          </span>
+                          <button
+                            onClick={() => { onIdentityReset(); setShowSettings(false); }}
+                            className="text-xs font-medium px-2.5 py-1.5 rounded-lg transition-all min-h-[36px]"
+                            style={{
+                              backgroundColor: highContrast ? '#f0f0f0' : 'var(--color-sand-100)',
+                              color: highContrast ? '#000000' : 'var(--color-text-muted)',
+                            }}
+                          >
+                            Wechseln
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     <button
                       onClick={() => setShowSettings(false)}

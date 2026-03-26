@@ -47,6 +47,10 @@ export const createMemorySchema = z.object({
     .min(-180).max(180)
     .optional()
     .nullable(),
+  recorded_by: z
+    .string()
+    .max(50)
+    .optional(),
 });
 
 /**
