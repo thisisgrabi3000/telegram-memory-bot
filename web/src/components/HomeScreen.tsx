@@ -270,7 +270,11 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
   }, [filteredMemories]);
 
   const allPersons = ['Alle', ...FAMILY_MEMBERS.map(m => m.name)];
-  const allLocations = ['Alle', ...LOCATIONS.map(l => `${l.emoji} ${l.name}`)];
+  const allLocations = ['Alle', ...LOCATIONS.map(l => l.name)];
+
+  function getLocationEmoji(name: string): string {
+    return LOCATIONS.find(l => l.name === name)?.emoji ?? '📍';
+  }
 
   const timeOptions = [
     { value: 'all', label: 'Alle', icon: '🌐' },
@@ -637,7 +641,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                         className="w-full appearance-none px-3 py-2 rounded-xl text-sm font-medium cursor-pointer focus:outline-none"
                         style={{ backgroundColor: 'var(--color-sand-50)', border: '1.5px solid var(--color-sand-200)', color: 'var(--color-text-primary)' }}>
                         {allLocations.map(loc => (
-                          <option key={loc} value={loc === 'Alle' ? 'Alle' : loc.split(' ').slice(1).join(' ')}>{loc}</option>
+                          <option key={loc} value={loc}>{loc === 'Alle' ? 'Alle' : `${getLocationEmoji(loc)} ${loc}`}</option>
                         ))}
                       </select>
                       <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
@@ -693,7 +697,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
             {locationFilter !== 'Alle' && (
               <span className="flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold"
                 style={{ backgroundColor: 'rgba(146,122,94,0.1)', color: 'var(--color-sand-700)', border: '1px solid rgba(146,122,94,0.2)' }}>
-                📍 {locationFilter}
+                {getLocationEmoji(locationFilter)} {locationFilter}
                 <button onClick={() => setLocationFilter('Alle')} className="p-1.5 -mr-0.5 rounded-full hover:bg-sand-200 transition-all"><X className="w-3 h-3" /></button>
               </span>
             )}

@@ -107,10 +107,34 @@ export interface Memory {
 }
 
 export const LOCATIONS = [
-  { name: 'Zuhause', emoji: '🏠' },
-  { name: 'Oma & Opa', emoji: '👵' },
-  { name: 'Kita', emoji: '🏫' },
-  { name: 'Spielplatz', emoji: '🛝' },
-  { name: 'Urlaub', emoji: '✈️' },
-  { name: 'Unterwegs', emoji: '🚗' },
-];
+  {
+    name: 'Zuhause',
+    emoji: '🏠',
+    address: 'Saturnstr. 14, Lübeck',
+    latitude: 53.8290,
+    longitude: 10.7125,
+  },
+  {
+    name: 'Oma & Opa Eva',
+    emoji: '👵',
+    address: 'Gustav-Falke-Str., Lübeck',
+    latitude: 53.8448,
+    longitude: 10.7142,
+  },
+  {
+    name: 'Opa Peter & Moma',
+    emoji: '🏡',
+    address: 'Schützenstr. 43, Hattenhofen',
+    latitude: 48.6678,
+    longitude: 9.5598,
+  },
+  {
+    name: 'Arguineguín',
+    emoji: '🌴',
+    address: 'Gran Canaria',
+    latitude: 27.7591,
+    longitude: -15.6813,
+  },
+] as const;
+
+export type LocationName = (typeof LOCATIONS)[number]['name'];
