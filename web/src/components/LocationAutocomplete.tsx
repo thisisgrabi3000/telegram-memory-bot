@@ -1,10 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
-import { MapPin, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface LocationSuggestion {
   display_name: string;
   lat: string;
   lon: string;
+  extratags?: {
+    aeroway?: string;
+    amenity?: string;
+    tourism?: string;
+    leisure?: string;
+    shop?: string;
+    office?: string;
+  };
+  address?: {
+    city?: string;
+    town?: string;
+    village?: string;
+    country?: string;
+  };
 }
 
 export interface LocationResult {
@@ -19,6 +33,20 @@ interface LocationAutocompleteProps {
   onSelect: (result: LocationResult | null) => void;
   placeholder?: string;
   disabled?: boolean;
+}
+
+function getPlaceIcon(extratags?: LocationSuggestion['extratags']): string {
+  if (!extratags) return '📍';
+  if (extratags.aeroway === 'aerodrome') return '✈️';
+  if (extratags.amenity === 'restaurant' || extratags.amenity === 'cafe' || extratags.amenity === 'fast_food') return '🍽️';
+  if (extratags.tourism === 'attraction' || extratags.tourism === 'museum' || extratags.tourism === 'gallery') return '🏛️';
+  if (extratags.tourism === 'hotel' || extratags.tourism === 'hostel') return '🏨';
+  if (extratags.leisure === 'park' || extratags.leisure === 'garden') return '🌳';
+  if (extratags.amenity === 'hospital' || extratags.amenity === 'clinic') return '🏥';
+  if (extratags.amenity === 'school' || extratags.amenity === 'university') return '🏫';
+  if (extratags.shop) return '🛍️';
+  if (extratags.amenity === 'place_of_worship') return '⛪';
+  return '📍';
 }
 
 export function LocationAutocomplete({
@@ -66,7 +94,7 @@ export function LocationAutocomplete({
     debounceTimer.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val)}&format=json&limit=5&accept-language=de`;
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val)}&format=json&limit=8&accept-language=de&addressdetails=1&extratags=1`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json() as LocationSuggestion[];
@@ -97,17 +125,19 @@ export function LocationAutocomplete({
   return (
     <div ref={containerRef} style={{ position: 'relative' }}>
       <div style={{ position: 'relative' }}>
-        <MapPin
-          className="w-4 h-4"
+        <span
           style={{
             position: 'absolute',
             left: '0.75rem',
             top: '50%',
             transform: 'translateY(-50%)',
-            color: 'var(--color-sage-500)',
+            fontSize: '1rem',
             pointerEvents: 'none',
+            lineHeight: 1,
           }}
-        />
+        >
+          📍
+        </span>
         {loading && (
           <Loader2
             className="w-4 h-4 spinner"
@@ -167,6 +197,7 @@ export function LocationAutocomplete({
             const parts = s.display_name.split(',');
             const primary = parts[0].trim();
             const secondary = parts.slice(1, 3).join(',').trim();
+            const icon = getPlaceIcon(s.extratags);
             return (
               <button
                 key={i}
@@ -184,10 +215,7 @@ export function LocationAutocomplete({
                   (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
                 }}
               >
-                <MapPin
-                  className="w-4 h-4 flex-shrink-0 mt-0.5"
-                  style={{ color: 'var(--color-sage-500)' }}
-                />
+                <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: '1px', lineHeight: 1 }}>{icon}</span>
                 <div>
                   <div className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                     {primary}
