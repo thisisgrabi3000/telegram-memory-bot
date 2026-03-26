@@ -515,7 +515,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
             {/* Filter button */}
             <div className="relative">
               <button
-                onClick={() => setShowFilterDropdown(v => !v)}
+                onClick={(e) => { e.stopPropagation(); setShowFilterDropdown(v => !v); }}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
                 style={{
                   backgroundColor: showFilterDropdown || (personFilter !== 'Alle' || locationFilter !== 'Alle' || timeFilter !== '7d') ? 'rgba(117,143,90,0.12)' : 'white',
