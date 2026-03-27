@@ -522,18 +522,18 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                 )}
               </div>
 
-              {/* Add Memory Button */}
+              {/* Add Memory Button — hidden on mobile, replaced by FAB */}
               {onCreate && (
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="group flex items-center justify-center gap-2 sm:gap-2.5 min-w-[44px] min-h-[44px] px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl font-semibold text-white transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
+                  className="hidden sm:flex group items-center justify-center gap-2.5 min-w-[44px] min-h-[44px] px-5 py-3 rounded-2xl font-semibold text-white transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
                   style={{
                     background: highContrast ? '#000000' : 'linear-gradient(135deg, var(--color-terracotta-500) 0%, var(--color-terracotta-600) 50%, var(--color-rust-600) 100%)',
                     boxShadow: highContrast ? 'none' : 'var(--shadow-glow-terracotta)',
                   }}
                 >
                   <Plus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
-                  <span className="hidden sm:inline">Neue Erinnerung</span>
+                  Neue Erinnerung
                 </button>
               )}
             </div>
@@ -541,7 +541,10 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main
+        className="max-w-7xl mx-auto px-4 sm:px-6 py-8"
+        style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         {activeTab === 'feed' ? (<>
 
         {/* Compact Filter Bar */}
@@ -1545,6 +1548,44 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
           );
         })(),
         document.body
+      )}
+
+      {/* FAB — mobile only (hidden on sm+) */}
+      {onCreate && (
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="sm:hidden"
+          style={{
+            position: 'fixed',
+            bottom: 'calc(4.5rem + env(safe-area-inset-bottom, 0px))',
+            right: '1.25rem',
+            zIndex: 50,
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: highContrast
+              ? '#000000'
+              : 'linear-gradient(135deg, var(--color-terracotta-500) 0%, var(--color-terracotta-600) 50%, var(--color-rust-600) 100%)',
+            boxShadow: highContrast
+              ? '0 4px 16px rgba(0,0,0,0.5)'
+              : '0 4px 20px rgba(192,90,61,0.5), 0 2px 8px rgba(0,0,0,0.15)',
+            transition: 'transform 0.15s, box-shadow 0.15s',
+          }}
+          onTouchStart={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.93)';
+          }}
+          onTouchEnd={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+          }}
+          aria-label="Neue Erinnerung"
+        >
+          <Plus className="w-7 h-7" style={{ color: 'white' }} />
+        </button>
       )}
 
       {/* Create Memory Modal */}
