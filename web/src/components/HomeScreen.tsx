@@ -321,68 +321,49 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
       <header
         className="sticky top-0 z-40 backdrop-blur-2xl border-b"
         style={{
-          background: highContrast ? '#ffffff' : 'rgba(253, 250, 246, 0.85)',
-          borderColor: highContrast ? '#000000' : 'rgba(255, 255, 255, 0.8)',
+          background: highContrast ? '#ffffff' : 'rgba(253, 250, 246, 0.92)',
+          borderColor: highContrast ? '#000000' : 'var(--color-sand-200)',
         }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+
+          {/* Top row: Logo + right buttons (+ desktop tabs in center) */}
+          <div className="flex items-center justify-between py-3">
             {/* Logo & Title */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{
-                  background: highContrast ? '#000000' : 'linear-gradient(135deg, rgba(232,107,63,0.12) 0%, rgba(251,191,36,0.12) 100%)',
+                  background: highContrast ? '#000000' : 'linear-gradient(135deg, rgba(232,107,63,0.15) 0%, rgba(251,191,36,0.10) 100%)',
                 }}
               >
-                <Heart className="w-5 h-5" style={{ color: highContrast ? '#ffffff' : 'var(--color-terracotta-500)', fill: highContrast ? '#ffffff' : 'var(--color-terracotta-500)' }} />
+                <Heart className="w-4 h-4" style={{ color: highContrast ? '#ffffff' : 'var(--color-terracotta-500)', fill: highContrast ? '#ffffff' : 'var(--color-terracotta-500)' }} />
               </div>
               <h1
-                className="text-lg sm:text-2xl md:text-3xl font-bold gradient-text"
+                className="text-xl sm:text-2xl md:text-3xl font-bold gradient-text"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
                 Famories
               </h1>
             </div>
 
-            {/* Tab Navigation */}
-            <div className="flex gap-1.5 sm:gap-2">
-              <button
-                onClick={() => setActiveTab('feed')}
-                className={`flex items-center justify-center gap-1.5 sm:gap-2 min-w-[44px] min-h-[44px] px-3 sm:px-4 py-2 rounded-xl font-medium transition-all ${
-                  activeTab === 'feed'
-                    ? 'bg-gradient-to-r from-terracotta-500 to-terracotta-600 text-white'
-                    : 'bg-white/50 hover:bg-white/80'
-                }`}
-                style={activeTab === 'feed' ? { boxShadow: 'var(--shadow-glow-terracotta)' } : {}}
-              >
-                <List className="w-4 h-4" />
-                <span className="hidden sm:inline">Feed</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('map')}
-                className={`flex items-center justify-center gap-1.5 sm:gap-2 min-w-[44px] min-h-[44px] px-3 sm:px-4 py-2 rounded-xl font-medium transition-all ${
-                  activeTab === 'map'
-                    ? 'bg-gradient-to-r from-terracotta-500 to-terracotta-600 text-white'
-                    : 'bg-white/50 hover:bg-white/80'
-                }`}
-                style={activeTab === 'map' ? { boxShadow: 'var(--shadow-glow-terracotta)' } : {}}
-              >
-                <Map className="w-4 h-4" />
-                <span className="hidden sm:inline">Karte</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('timeline')}
-                className={`flex items-center justify-center gap-1.5 sm:gap-2 min-w-[44px] min-h-[44px] px-3 sm:px-4 py-2 rounded-xl font-medium transition-all ${
-                  activeTab === 'timeline'
-                    ? 'bg-gradient-to-r from-terracotta-500 to-terracotta-600 text-white'
-                    : 'bg-white/50 hover:bg-white/80'
-                }`}
-                style={activeTab === 'timeline' ? { boxShadow: 'var(--shadow-glow-terracotta)' } : {}}
-              >
-                <Clock className="w-4 h-4" />
-                <span className="hidden sm:inline">Chronik</span>
-              </button>
+            {/* Desktop tab navigation — hidden on mobile */}
+            <div className="hidden sm:flex gap-2">
+              {([['feed', <List key="l" className="w-4 h-4" />, 'Feed'], ['map', <Map key="m" className="w-4 h-4" />, 'Karte'], ['timeline', <Clock key="c" className="w-4 h-4" />, 'Chronik']] as [string, React.ReactNode, string][]).map(([id, icon, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id as 'feed' | 'map' | 'timeline')}
+                  className={`flex items-center justify-center gap-2 min-w-[44px] min-h-[44px] px-4 py-2 rounded-xl font-medium transition-all ${
+                    activeTab === id
+                      ? 'bg-gradient-to-r from-terracotta-500 to-terracotta-600 text-white'
+                      : 'bg-white/50 hover:bg-white/80'
+                  }`}
+                  style={activeTab === id ? { boxShadow: 'var(--shadow-glow-terracotta)' } : {}}
+                >
+                  {icon}
+                  <span>{label}</span>
+                </button>
+              ))}
             </div>
 
             {/* Right side buttons */}
@@ -537,6 +518,31 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Mobile tab bar row — full width, below logo row */}
+          <div className="flex sm:hidden border-t" style={{ borderColor: 'var(--color-sand-100)' }}>
+            {([['feed', <List key="l" className="w-4 h-4" />, 'Feed'], ['map', <Map key="m" className="w-4 h-4" />, 'Karte'], ['timeline', <Clock key="c" className="w-4 h-4" />, 'Chronik']] as [string, React.ReactNode, string][]).map(([id, icon, label]) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id as 'feed' | 'map' | 'timeline')}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-all relative"
+                style={{
+                  color: activeTab === id
+                    ? (highContrast ? '#000000' : 'var(--color-terracotta-500)')
+                    : (highContrast ? '#666666' : 'var(--color-text-muted)'),
+                }}
+              >
+                {icon}
+                <span>{label}</span>
+                {activeTab === id && (
+                  <span
+                    className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-10 rounded-full"
+                    style={{ backgroundColor: highContrast ? '#000000' : 'var(--color-terracotta-500)' }}
+                  />
+                )}
+              </button>
+            ))}
           </div>
         </div>
       </header>
