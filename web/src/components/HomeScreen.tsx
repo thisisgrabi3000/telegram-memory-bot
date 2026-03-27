@@ -280,12 +280,12 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
       .sort((a, b) => new Date(b.source_date).getTime() - new Date(a.source_date).getTime());
   }, [filteredMemories]);
 
-  // One entry per memory (first photo as thumbnail)
+  // All memories with photos — no time filter, sorted newest first
   const memoryPhotoGroups = useMemo(() => {
-    return filteredMemories
+    return memories
       .filter(m => m.photos && m.photos.length > 0)
       .sort((a, b) => new Date(b.source_date).getTime() - new Date(a.source_date).getTime());
-  }, [filteredMemories]);
+  }, [memories]);
 
   const allPersons = ['Alle', ...FAMILY_MEMBERS.map(m => m.name)];
   const allLocations = ['Alle', ...LOCATIONS.map(l => l.name)];
