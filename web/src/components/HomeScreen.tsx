@@ -542,7 +542,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
       </header>
 
       <main
-        className="max-w-7xl mx-auto px-4 sm:px-6 py-8"
+        className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8"
         style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}
       >
         {activeTab === 'feed' ? (<>
