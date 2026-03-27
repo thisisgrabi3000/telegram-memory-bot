@@ -16,9 +16,9 @@ export function HorizontalTimeline({ memories, onOpenMemory }: HorizontalTimelin
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const entries = useMemo<TimelineEntry[]>(() => {
-    const sorted = [...memories].sort(
-      (a, b) => new Date(a.source_date).getTime() - new Date(b.source_date).getTime()
-    );
+    const sorted = [...memories]
+      .filter(m => m.photos && m.photos.length > 0)
+      .sort((a, b) => new Date(a.source_date).getTime() - new Date(b.source_date).getTime());
 
     const result: TimelineEntry[] = [];
     let lastMonthKey = '';
@@ -196,9 +196,7 @@ export function HorizontalTimeline({ memories, onOpenMemory }: HorizontalTimelin
                   height: '88px',
                   borderRadius: '12px',
                   overflow: 'hidden',
-                  background: firstPhoto
-                    ? 'var(--color-sand-100)'
-                    : 'linear-gradient(135deg, var(--color-terracotta-100) 0%, var(--color-sand-100) 100%)',
+                  background: 'var(--color-sand-100)',
                   border: '2px solid var(--color-sand-200)',
                   position: 'relative',
                   transition: 'transform 0.15s, box-shadow 0.15s',
@@ -212,28 +210,13 @@ export function HorizontalTimeline({ memories, onOpenMemory }: HorizontalTimelin
                   (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
                 }}
               >
-                {firstPhoto ? (
-                  <img
-                    src={firstPhoto.url}
-                    alt=""
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                    loading="lazy"
-                    draggable={false}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1.75rem',
-                    }}
-                  >
-                    💬
-                  </div>
-                )}
+                <img
+                  src={firstPhoto!.url}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  loading="lazy"
+                  draggable={false}
+                />
                 {/* Multi-photo badge */}
                 {photoCount > 1 && (
                   <div

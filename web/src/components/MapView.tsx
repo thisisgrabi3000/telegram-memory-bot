@@ -47,14 +47,12 @@ function LocationPopup({ memories }: { memories: Memory[] }) {
 
   // Collect all photos from all memories in this group
   const allItems = useMemo(() => {
-    const items: { photo: { url: string } | null; memory: Memory }[] = [];
+    const items: { photo: { url: string }; memory: Memory }[] = [];
     for (const memory of memories) {
       if (memory.photos && memory.photos.length > 0) {
         for (const photo of memory.photos) {
           items.push({ photo, memory });
         }
-      } else {
-        items.push({ photo: null, memory });
       }
     }
     return items;
@@ -87,33 +85,17 @@ function LocationPopup({ memories }: { memories: Memory[] }) {
     >
       {/* Image area with navigation */}
       <div className="relative" style={{ marginBottom: '8px' }}>
-        {current.photo ? (
-          <img
-            src={current.photo.url}
-            alt=""
-            style={{
-              width: '100%',
-              height: '180px',
-              objectFit: 'cover',
-              borderRadius: '8px',
-              display: 'block',
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              width: '100%',
-              height: '100px',
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #f5f0eb 0%, #ede5db 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <MapPin style={{ width: '24px', height: '24px', color: '#b8a898' }} />
-          </div>
-        )}
+        <img
+          src={current.photo.url}
+          alt=""
+          style={{
+            width: '100%',
+            height: '180px',
+            objectFit: 'cover',
+            borderRadius: '8px',
+            display: 'block',
+          }}
+        />
 
         {/* Navigation arrows */}
         {hasMultiple && (
