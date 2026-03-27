@@ -187,15 +187,15 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop"
+      className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center sm:items-center sm:p-4 modal-backdrop"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-3xl overflow-hidden animate-fade-in-scale"
+        className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden animate-fade-in-scale"
         style={{
           backgroundColor: 'var(--color-bg-primary)',
           boxShadow: 'var(--shadow-2xl)',
-          maxHeight: '90vh',
+          maxHeight: 'min(92dvh, 92vh)',
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -243,12 +243,13 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
           </button>
         </div>
 
-        {/* Scrollable form body */}
+        {/* Form: scrollable fields + sticky submit footer */}
         <form
           onSubmit={handleSubmit}
-          className="p-6 space-y-6 overflow-y-auto"
-          style={{ flex: 1 }}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}
         >
+        {/* Scrollable fields */}
+        <div className="p-6 space-y-6 overflow-y-auto" style={{ flex: 1 }}>
           {/* Photo Upload */}
           <div>
             <label
@@ -484,43 +485,55 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
             </div>
           )}
 
-          {/* Submit */}
-          <div className="flex gap-3 pt-2" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="flex-1 px-4 py-3.5 rounded-xl font-semibold transition-all duration-200 hover:bg-white/80"
-              style={{
-                backgroundColor: 'var(--color-sand-100)',
-                color: 'var(--color-text-muted)',
-              }}
-            >
-              Abbrechen
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex-1 flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-xl font-bold text-white transition-all duration-300 disabled:opacity-50 hover:scale-[1.02] hover:-translate-y-0.5"
-              style={{
-                background: isSubmitting
-                  ? 'linear-gradient(135deg, rgba(232,107,63,0.5) 0%, rgba(213,79,37,0.5) 100%)'
-                  : 'linear-gradient(135deg, var(--color-terracotta-500) 0%, var(--color-terracotta-600) 50%, var(--color-rust-600) 100%)',
-                boxShadow: isSubmitting ? 'none' : 'var(--shadow-glow-terracotta)',
-              }}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Speichern...</span>
-                </>
-              ) : (
-                <>
-                  <Check className="w-5 h-5" />
-                  <span>Speichern</span>
-                </>
-              )}
-            </button>
+        </div>{/* end scrollable fields */}
+
+          {/* Sticky submit footer — always visible, outside scroll */}
+          <div
+            style={{
+              flexShrink: 0,
+              padding: '0.75rem 1.5rem',
+              paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+              borderTop: '1px solid var(--color-sand-100)',
+              backgroundColor: 'var(--color-bg-primary)',
+            }}
+          >
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-3.5 rounded-xl font-semibold transition-all duration-200 hover:bg-white/80"
+                style={{
+                  backgroundColor: 'var(--color-sand-100)',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                Abbrechen
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1 flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-xl font-bold text-white transition-all duration-300 disabled:opacity-50 hover:scale-[1.02] hover:-translate-y-0.5"
+                style={{
+                  background: isSubmitting
+                    ? 'linear-gradient(135deg, rgba(232,107,63,0.5) 0%, rgba(213,79,37,0.5) 100%)'
+                    : 'linear-gradient(135deg, var(--color-terracotta-500) 0%, var(--color-terracotta-600) 50%, var(--color-rust-600) 100%)',
+                  boxShadow: isSubmitting ? 'none' : 'var(--shadow-glow-terracotta)',
+                }}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Speichern...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-5 h-5" />
+                    <span>Speichern</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>
