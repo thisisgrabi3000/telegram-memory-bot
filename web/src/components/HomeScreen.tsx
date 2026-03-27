@@ -1262,153 +1262,44 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
             background: 'rgba(42, 33, 24, 0.88)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '1rem',
-            gap: '1rem',
           }}
           onClick={() => { setLightboxImage(null); setPhotoDeleteConfirm(false); }}
-          onTouchStart={(e) => setLightboxTouchStartX(e.touches[0].clientX)}
-          onTouchEnd={(e) => {
-            const delta = lightboxTouchStartX - e.changedTouches[0].clientX;
-            if (delta > 50) lightboxGoNext();
-            else if (delta < -50) lightboxGoPrev();
-          }}
         >
-          {/* Close button */}
-          <button
+          {/* Scrollable content — image + info panel sit above Safari toolbar */}
+          <div
             style={{
               position: 'absolute',
-              top: 'max(1rem, env(safe-area-inset-top, 1rem))',
-              right: '1rem',
-              padding: '0.75rem',
-              minWidth: '48px',
-              minHeight: '48px',
-              borderRadius: '1rem',
-              backgroundColor: 'rgba(255,255,255,0.95)',
-              border: 'none',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+              inset: 0,
+              overflowY: 'auto',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'center',
+              paddingTop: 'max(4.5rem, calc(3.5rem + env(safe-area-inset-top)))',
+              paddingLeft: '1rem',
+              paddingRight: '1rem',
+              paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
+              gap: '1rem',
             }}
-            onClick={() => { setLightboxImage(null); setPhotoDeleteConfirm(false); }}
+            onTouchStart={(e) => setLightboxTouchStartX(e.touches[0].clientX)}
+            onTouchEnd={(e) => {
+              const delta = lightboxTouchStartX - e.changedTouches[0].clientX;
+              if (delta > 50) lightboxGoNext();
+              else if (delta < -50) lightboxGoPrev();
+            }}
           >
-            <X className="w-6 h-6" style={{ color: '#1a1a1a' }} />
-          </button>
-
-          {/* Delete button (only if onDeletePhoto is available) */}
-          {onDeletePhoto && (
-            <button
-              style={{
-                position: 'absolute',
-                top: 'max(1rem, env(safe-area-inset-top, 1rem))',
-                left: '1rem',
-                padding: '0.75rem',
-                minWidth: '48px',
-                minHeight: '48px',
-                borderRadius: '1rem',
-                backgroundColor: photoDeleteConfirm ? 'rgba(220,38,38,0.9)' : 'rgba(255,255,255,0.95)',
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'background-color 0.2s',
-              }}
-              onClick={(e) => { e.stopPropagation(); setPhotoDeleteConfirm(v => !v); }}
-            >
-              <Trash2 className="w-6 h-6" style={{ color: photoDeleteConfirm ? 'white' : '#dc2626' }} />
-            </button>
-          )}
-
-          {/* Photo counter */}
-          {totalPhotos > 1 && (
-            <div
-              style={{
-                position: 'absolute',
-                top: 'max(1rem, env(safe-area-inset-top, 1rem))',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: 'rgba(0,0,0,0.5)',
-                color: 'white',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                padding: '0.35rem 0.75rem',
-                borderRadius: '999px',
-                pointerEvents: 'none',
-              }}
-            >
-              {lightboxImage.photoIndex + 1} / {totalPhotos}
-            </div>
-          )}
-
-          {/* Prev button */}
-          {totalPhotos > 1 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); lightboxGoPrev(); }}
-              style={{
-                position: 'absolute',
-                left: '1rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'rgba(255,255,255,0.9)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '48px',
-                height: '48px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-              }}
-            >
-              <ChevronLeft className="w-6 h-6" style={{ color: '#1a1a1a' }} />
-            </button>
-          )}
-
-          {/* Next button */}
-          {totalPhotos > 1 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); lightboxGoNext(); }}
-              style={{
-                position: 'absolute',
-                right: '1rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'rgba(255,255,255,0.9)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '48px',
-                height: '48px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-              }}
-            >
-              <ChevronRight className="w-6 h-6" style={{ color: '#1a1a1a' }} />
-            </button>
-          )}
-
-          {/* Image – natural aspect ratio, constrained to viewport */}
+          {/* Image – max 60% of screen height so text is always visible below */}
           <img
             src={currentPhoto.url}
             alt=""
             style={{
               maxWidth: 'calc(100vw - 2rem)',
-              maxHeight: 'calc(100vh - 160px)',
+              maxHeight: '60dvh',
               width: 'auto',
               height: 'auto',
               borderRadius: '1.5rem',
               boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
               display: 'block',
+              flexShrink: 0,
             }}
             onClick={(e) => e.stopPropagation()}
           />
@@ -1423,6 +1314,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
               border: '1px solid rgba(255,255,255,0.2)',
+              flexShrink: 0,
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1550,6 +1442,133 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
               </div>
             )}
           </div>
+          </div>
+
+        {/* Close button */}
+        <button
+          style={{
+            position: 'absolute',
+            top: 'max(1rem, env(safe-area-inset-top, 1rem))',
+            right: '1rem',
+            zIndex: 1,
+            padding: '0.75rem',
+            minWidth: '48px',
+            minHeight: '48px',
+            borderRadius: '1rem',
+            backgroundColor: 'rgba(255,255,255,0.95)',
+            border: 'none',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => { setLightboxImage(null); setPhotoDeleteConfirm(false); }}
+        >
+          <X className="w-6 h-6" style={{ color: '#1a1a1a' }} />
+        </button>
+
+        {/* Delete button */}
+        {onDeletePhoto && (
+          <button
+            style={{
+              position: 'absolute',
+              top: 'max(1rem, env(safe-area-inset-top, 1rem))',
+              left: '1rem',
+              zIndex: 1,
+              padding: '0.75rem',
+              minWidth: '48px',
+              minHeight: '48px',
+              borderRadius: '1rem',
+              backgroundColor: photoDeleteConfirm ? 'rgba(220,38,38,0.9)' : 'rgba(255,255,255,0.95)',
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background-color 0.2s',
+            }}
+            onClick={(e) => { e.stopPropagation(); setPhotoDeleteConfirm(v => !v); }}
+          >
+            <Trash2 className="w-6 h-6" style={{ color: photoDeleteConfirm ? 'white' : '#dc2626' }} />
+          </button>
+        )}
+
+        {/* Photo counter */}
+        {totalPhotos > 1 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 'max(1rem, env(safe-area-inset-top, 1rem))',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 1,
+              background: 'rgba(0,0,0,0.5)',
+              color: 'white',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              padding: '0.35rem 0.75rem',
+              borderRadius: '999px',
+              pointerEvents: 'none',
+            }}
+          >
+            {lightboxImage.photoIndex + 1} / {totalPhotos}
+          </div>
+        )}
+
+        {/* Prev button */}
+        {totalPhotos > 1 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); lightboxGoPrev(); }}
+            style={{
+              position: 'absolute',
+              left: '1rem',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 1,
+              background: 'rgba(255,255,255,0.9)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '48px',
+              height: '48px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            }}
+          >
+            <ChevronLeft className="w-6 h-6" style={{ color: '#1a1a1a' }} />
+          </button>
+        )}
+
+        {/* Next button */}
+        {totalPhotos > 1 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); lightboxGoNext(); }}
+            style={{
+              position: 'absolute',
+              right: '1rem',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 1,
+              background: 'rgba(255,255,255,0.9)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '48px',
+              height: '48px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            }}
+          >
+            <ChevronRight className="w-6 h-6" style={{ color: '#1a1a1a' }} />
+          </button>
+        )}
+
         </div>
           );
         })(),
