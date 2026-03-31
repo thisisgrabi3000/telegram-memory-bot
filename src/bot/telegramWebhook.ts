@@ -11,6 +11,7 @@ import { extractExifData, canHaveExif } from '../services/exifService';
 import { CHILDREN, LOCATIONS } from '../config/children';
 import { isChatAllowed, getAllowedChatCount } from '../config/allowedChats';
 import { getSpeakerByChatId, analyzeTranscript, formatSpeakerInfo } from '../config/speakers';
+import { compressImage } from '../services/imageCompressionService';
 
 /**
  * Pending transcriptions waiting for user confirmation/edit.
@@ -857,7 +858,6 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
       try {
         // Lade Foto herunter
         const localPath = await telegramService.downloadPhotoFile(photoMessage.file_id);
-        const fileName = path.basename(localPath);
         console.log('Foto gespeichert:', localPath);
 
         // Extrahiere EXIF-Daten (GPS, Aufnahmedatum)
@@ -886,6 +886,9 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
           }
         }
 
+        // Komprimiere Foto (nach EXIF-Extraktion, damit GPS-Daten vorher gelesen werden)
+        const compressedFilename = await compressImage(localPath);
+
         // Finde den letzten Eintrag (innerhalb der letzten 5 Minuten)
         const lastEntry = memoryRepository.findLast(photoMessage.chat_id);
         const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
@@ -898,7 +901,7 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
             memory_entry_id: lastEntry.id,
             media_type: 'photo',
             telegram_file_id: photoMessage.file_id,
-            local_path: fileName,
+            local_path: compressedFilename,
           });
 
           // Aktualisiere Ort wenn aus EXIF und noch nicht gesetzt
@@ -951,7 +954,7 @@ telegramWebhook.post('/telegram', async (req: Request, res: Response) => {
             memory_entry_id: entry.id,
             media_type: 'photo',
             telegram_file_id: photoMessage.file_id,
-            local_path: fileName,
+            local_path: compressedFilename,
           });
 
           // Baue EXIF-Info für Bestätigung
