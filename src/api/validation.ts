@@ -85,6 +85,17 @@ export const favoriteSchema = z.object({
 });
 
 /**
+ * Schema für POST /memories/:id/audio
+ */
+export const audioAttachSchema = z.object({
+  filename: z.string().regex(
+    /^voice_\d+_[a-z0-9]+\.[a-z0-9]+$/i,
+    'Ungültiger Dateiname'
+  ),
+  voice_speaker: z.string().max(MAX_NAME_LENGTH).optional().nullable(),
+});
+
+/**
  * Schema für GET /memories Query-Parameter
  */
 export const memoriesQuerySchema = z.object({
