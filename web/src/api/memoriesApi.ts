@@ -11,7 +11,7 @@ interface ApiResponse<T> {
 
 interface RawMemory extends Omit<Memory, 'photos' | 'audios' | 'videos'> {
   photos: Array<{ id: number; url: string; filename: string }>;
-  audios: Array<{ id: number; url: string; filename: string }>;
+  audios: Array<{ id: number; url: string; filename: string; voice_speaker: string | null }>;
   videos: Array<{ id: number; url: string; filename: string }>;
 }
 
@@ -254,9 +254,15 @@ export async function searchMemories(query: string): Promise<Memory[]> {
   return json.data.map(transformMemoryUrls);
 }
 
-export async function transcribeAudio(audioBlob: Blob): Promise<string> {
+export async function transcribeAudio(
+  audioBlob: Blob,
+  saveFile?: boolean
+): Promise<{ text: string; savedFilename?: string }> {
   const formData = new FormData();
   formData.append('audio', audioBlob, 'recording.webm');
+  if (saveFile) {
+    formData.append('saveFile', 'true');
+  }
 
   const response = await fetch(`${API_BASE_URL}/api/transcribe`, {
     method: 'POST',
@@ -274,5 +280,30 @@ export async function transcribeAudio(audioBlob: Blob): Promise<string> {
     throw new Error(json.error || 'Transkription fehlgeschlagen');
   }
 
-  return json.data.text;
+  return json.data as { text: string; savedFilename?: string };
+}
+
+export async function attachAudio(
+  memoryId: number,
+  filename: string,
+  voiceSpeaker?: string | null
+): Promise<Memory> {
+  const response = await fetch(`${API_BASE_URL}/api/memories/${memoryId}/audio`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ filename, voice_speaker: voiceSpeaker ?? null }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
+  }
+
+  const json: ApiResponse<RawMemory> = await response.json();
+
+  if (!json.success) {
+    throw new Error(json.error || 'Fehler beim Anhängen der Audiodatei');
+  }
+
+  return transformMemoryUrls(json.data);
 }
