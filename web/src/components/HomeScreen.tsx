@@ -165,12 +165,15 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
 
   // Sync lightboxImage.memory when memories state updates (e.g. after save)
   useEffect(() => {
-    if (!lightboxImage) return;
-    const updated = memories.find(m => m.id === lightboxImage.memory.id);
-    if (updated && updated !== lightboxImage.memory) {
-      setLightboxImage(prev => prev ? { ...prev, memory: updated } : null);
-    }
-  }, [memories, lightboxImage]);
+    setLightboxImage(prev => {
+      if (!prev) return null;
+      const updated = memories.find(m => m.id === prev.memory.id);
+      if (updated && updated !== prev.memory) {
+        return { ...prev, memory: updated };
+      }
+      return prev;
+    });
+  }, [memories]);
 
   // Keyboard handler for lightbox
   useEffect(() => {
@@ -1557,6 +1560,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                         setLightboxEditMode(true);
                       }}
                       title="Text bearbeiten"
+                      aria-label="Text bearbeiten"
                       style={{
                         flexShrink: 0,
                         padding: '0.25rem',
