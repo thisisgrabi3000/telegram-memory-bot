@@ -1,13 +1,15 @@
 import { useState, useRef } from 'react';
-import { X, User, MapPin, Calendar, Loader2, Sparkles, PenLine, Check, Camera, ImagePlus, Mic } from 'lucide-react';
+import { X, User, MapPin, Calendar, Loader2, Sparkles, PenLine, Check, Camera, ImagePlus, Mic, Music } from 'lucide-react';
 import { VoiceRecorder } from './VoiceRecorder';
-import { transcribeAudio } from '../api/memoriesApi';
+import { transcribeAudio, attachAudio } from '../api/memoriesApi';
 import exifr from 'exifr';
 import { FAMILY_MEMBERS, LOCATIONS } from '../types';
+import type { Memory } from '../types';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import type { LocationResult } from './LocationAutocomplete';
 
 const CHILDREN = ['Junis', 'Noah'];
+const SPEAKER_OPTIONS = [...FAMILY_MEMBERS.map(m => m.name), 'Mehrere'];
 
 interface CreateMemoryModalProps {
   onClose: () => void;
@@ -20,7 +22,7 @@ interface CreateMemoryModalProps {
     photos?: File[];
     latitude?: number;
     longitude?: number;
-  }) => Promise<void>;
+  }) => Promise<Memory>;
 }
 
 export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps) {
@@ -36,6 +38,11 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
   const [error, setError] = useState<string | null>(null);
   const [textFocused, setTextFocused] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [pendingAudioFilename, setPendingAudioFilename] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [saveVoiceAudio, setSaveVoiceAudio] = useState(false);
+  const [voiceSpeaker, setVoiceSpeaker] = useState<string | null>(null);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [exifHint, setExifHint] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -142,22 +149,49 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
     setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
   }
 
+  async function handleAudioFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input
+    e.target.value = '';
+
+    setIsTranscribing(true);
+    setError(null);
+    setPendingAudioFilename(null);
+    setVoiceSpeaker(null);
+
+    try {
+      const result = await transcribeAudio(file, true);
+      setText(prev => prev ? `${prev}\n\n${result.text}` : result.text);
+      if (result.savedFilename) {
+        setPendingAudioFilename(result.savedFilename);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Audio-Transkription fehlgeschlagen');
+    } finally {
+      setIsTranscribing(false);
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     setIsSubmitting(true);
     setError(null);
 
-    // Derive child_name from selected children
     const child_name = selectedPeople.find(p => CHILDREN.includes(p)) || undefined;
 
     try {
-      // Transcribe audio if present
+      // 1. Transcribe voice recording (with optional save)
       let finalText = text.trim();
+      let voiceSavedFilename: string | undefined;
+
       if (audioBlob) {
         try {
-          const transcribed = await transcribeAudio(audioBlob);
-          finalText = finalText ? `${finalText}\n\n${transcribed}` : transcribed;
+          const shouldSave = saveVoiceAudio && !pendingAudioFilename;
+          const result = await transcribeAudio(audioBlob, shouldSave);
+          finalText = finalText ? `${finalText}\n\n${result.text}` : result.text;
+          if (shouldSave) voiceSavedFilename = result.savedFilename;
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Transkription fehlgeschlagen');
           setIsSubmitting(false);
@@ -165,7 +199,8 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
         }
       }
 
-      await onCreate({
+      // 2. Create memory
+      const created = await onCreate({
         text: finalText,
         child_name,
         location: location || undefined,
@@ -175,7 +210,18 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
         latitude: locationCoords?.latitude,
         longitude: locationCoords?.longitude,
       });
-      // Cleanup previews
+
+      // 3. Attach audio file if any (file upload takes precedence over voice recording)
+      const filenameToAttach = pendingAudioFilename ?? voiceSavedFilename;
+      if (filenameToAttach) {
+        try {
+          await attachAudio(created.id, filenameToAttach, voiceSpeaker);
+        } catch (err) {
+          // Memory was saved — non-blocking warning only
+          console.warn('Audio konnte nicht angehängt werden:', err);
+        }
+      }
+
       photoPreviews.forEach(url => URL.revokeObjectURL(url));
       onClose();
     } catch (err) {
@@ -303,6 +349,54 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
             </button>
           </div>
 
+          {/* Audio Upload */}
+          <div>
+            <label
+              className="flex items-center gap-2 text-sm font-bold mb-3"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              <Music className="w-4 h-4" style={{ color: 'var(--color-terracotta-500)' }} />
+              Audio hochladen
+            </label>
+            <input
+              type="file"
+              ref={audioFileInputRef}
+              accept=".m4a,.mp3,.ogg,.opus,.wav,.aac,.webm"
+              onChange={handleAudioFileChange}
+              className="hidden"
+              disabled={isSubmitting}
+            />
+            <button
+              type="button"
+              onClick={() => audioFileInputRef.current?.click()}
+              disabled={isSubmitting || isTranscribing || !!pendingAudioFilename}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed text-sm font-semibold transition-all duration-200 min-h-[44px]"
+              style={{
+                borderColor: 'var(--color-sand-300)',
+                color: 'var(--color-text-muted)',
+                backgroundColor: 'white',
+              }}
+            >
+              {isTranscribing ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Transkribiere...</>
+              ) : pendingAudioFilename ? (
+                <><Check className="w-4 h-4" style={{ color: 'var(--color-sage-500)' }} /> Audio bereit</>
+              ) : (
+                <><Music className="w-4 h-4" /> 🎵 Audio hochladen</>
+              )}
+            </button>
+            {pendingAudioFilename && (
+              <button
+                type="button"
+                onClick={() => { setPendingAudioFilename(null); setVoiceSpeaker(null); }}
+                className="mt-1.5 text-xs"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                Audio entfernen
+              </button>
+            )}
+          </div>
+
           {/* Voice Recording */}
           <div>
             <label
@@ -313,10 +407,51 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
               Sprachnotiz
             </label>
             <VoiceRecorder
-              onRecordingChange={setAudioBlob}
+              onRecordingChange={(blob) => {
+                setAudioBlob(blob);
+                if (!blob) { setSaveVoiceAudio(false); setVoiceSpeaker(null); }
+              }}
+              showSaveToggle={true}
+              onSaveAudioChange={(save) => {
+                setSaveVoiceAudio(save);
+                if (!save) setVoiceSpeaker(null);
+              }}
               disabled={isSubmitting}
             />
           </div>
+
+          {/* Speaker Picker — shown when an audio file is queued or voice save is on */}
+          {(pendingAudioFilename || (audioBlob && saveVoiceAudio)) && (
+            <div>
+              <label
+                className="flex items-center gap-2 text-sm font-bold mb-3"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                🎙️ Wessen Stimme ist das?
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {SPEAKER_OPTIONS.map((name) => {
+                  const member = FAMILY_MEMBERS.find(m => m.name === name);
+                  const active = voiceSpeaker === name;
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setVoiceSpeaker(active ? null : name)}
+                      className="px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-105"
+                      style={{
+                        backgroundColor: active ? (member?.color.activeBg ?? 'var(--color-sand-600)') : 'white',
+                        color: active ? 'white' : (member?.color.text ?? 'var(--color-text-muted)'),
+                        border: active ? 'none' : '2px solid var(--color-sand-200)',
+                      }}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Text Input */}
           <div>
