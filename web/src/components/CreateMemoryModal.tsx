@@ -310,14 +310,15 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
             {photoPreviews.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {photoPreviews.map((url, i) => (
-                  <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden group">
+                  <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden">
                     <img src={url} alt="" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removePhoto(i)}
-                      className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
                     >
-                      <X className="w-4 h-4 text-white" />
+                      <X className="w-3 h-3 text-white" />
                     </button>
                   </div>
                 ))}
@@ -345,8 +346,17 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
               }}
             >
               <ImagePlus className="w-4 h-4" />
-              {photos.length === 0 ? 'Fotos hinzufügen' : `${photos.length} Foto${photos.length > 1 ? 's' : ''} gewählt`}
+              {photos.length === 0
+                ? 'Fotos hinzufügen'
+                : photos.length < 10
+                  ? `${photos.length} Foto${photos.length > 1 ? 's' : ''} · Weitere hinzufügen`
+                  : '10/10 Fotos'}
             </button>
+            {photos.length === 0 && (
+              <p className="text-xs mt-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                Mehrere Fotos gleichzeitig auswählbar (max. 10)
+              </p>
+            )}
           </div>
 
           {/* Audio Upload */}
