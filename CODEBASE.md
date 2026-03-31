@@ -72,17 +72,18 @@ Produktiv erreichbar unter: **famories.info**
 │   │   ├── types/index.ts        # Memory-Interface, FAMILY_MEMBERS (mit Farben), CATEGORIES, LOCATIONS
 │   │   ├── api/memoriesApi.ts    # fetch-Wrapper für alle API-Calls + URL-Transformation
 │   │   └── components/
-│   │       ├── HomeScreen.tsx    # Hauptseite: Filter, Grid, Timeline, Lightbox (~1300 Zeilen)
-│   │       ├── LoginScreen.tsx   # Passwort-Eingabe
-│   │       ├── MapView.tsx       # Leaflet-Karte mit Clustering und Popups
-│   │       ├── MemoryCard.tsx    # (Dead Code – wird nicht verwendet, tree-shaken)
-│   │       ├── CardGrid.tsx      # (Dead Code – wird nicht verwendet, tree-shaken)
-│   │       ├── FilterBar.tsx     # (Dead Code – wird nicht verwendet, tree-shaken)
-│   │       ├── TimelineView.tsx  # Timeline-Layout (in HomeScreen eingebunden)
-│   │       ├── Header.tsx        # App-Header
-│   │       ├── CreateMemoryModal.tsx  # Modal: Neue Erinnerung aus der Web-App erstellen
-│   │       ├── ExportCard.tsx    # Erinnerung als PNG exportieren (html2canvas)
-│   │       ├── EmptyState.tsx    # Leerer Zustand
+│   │       ├── HomeScreen.tsx         # Hauptseite: Filter, Grid, Timeline, Lightbox, AudioPlayer, Speaker-Filter
+│   │       ├── LoginScreen.tsx        # Passwort-Eingabe
+│   │       ├── MapView.tsx            # Leaflet-Karte mit Clustering und Popups
+│   │       ├── HorizontalTimeline.tsx # Timeline-Layout (in HomeScreen eingebunden)
+│   │       ├── IdentityPicker.tsx     # Familienmitglied nach Login auswählen (localStorage)
+│   │       ├── LocationAutocomplete.tsx # Nominatim-Suche für Orte
+│   │       ├── CreateMemoryModal.tsx  # Modal: Text, Fotos, Audio-Upload, Sprachnotiz, Speaker-Picker
+│   │       ├── VoiceRecorder.tsx      # Browser-Aufnahme mit "Mit Audio speichern" Toggle
+│   │       ├── AudioPlayer.tsx        # Play/Pause-Player mit Zeitanzeige und Speaker-Label (🎙️)
+│   │       ├── MemoryCard.tsx    # (Dead Code – tree-shaken)
+│   │       ├── CardGrid.tsx      # (Dead Code – tree-shaken)
+│   │       ├── FilterBar.tsx     # (Dead Code – tree-shaken)
 │   │       └── index.ts          # Re-exports
 │   └── dist/                     # Gebautes Frontend (im Git, wird von Express serviert)
 ├── uploads/                      # Permanente Mediadateien (Fotos, Audio, Video) – NICHT im Git
@@ -128,8 +129,9 @@ Produktiv erreichbar unter: **famories.info**
 | `id` | Auto-increment PK |
 | `memory_entry_id` | FK → memory_entries (ON DELETE CASCADE) |
 | `media_type` | `photo` / `audio` / `video` |
-| `telegram_file_id` | Telegram-interner Dateischlüssel |
+| `telegram_file_id` | Telegram-interner Dateischlüssel (Web-Uploads: `web_<filename>`) |
 | `local_path` | Dateiname in `uploads/` |
+| `voice_speaker` | Sprecher-Name für Audio-Anhänge (z.B. "Junis"), nullable (Migration 007) |
 
 ### `telegram_users` – Registrierte Nutzer
 
@@ -145,6 +147,18 @@ Speichert KI-generierte Wochenrückblicke mit `highlights`, `themes` und `weekly
 ### `migrations` – Migrationsprotokoll
 
 Verfolgt welche Migrationen bereits angewendet wurden.
+
+### Migrations-Übersicht
+
+| # | Name | Inhalt |
+|---|---|---|
+| 001 | initial_schema | Basistabellen: memory_entries, media_attachments, weekly_summaries, migrations |
+| 002 | telegram_users | telegram_users Tabelle |
+| 003 | add_location_favorite | location, is_favorite Spalten in memory_entries |
+| 004 | add_performance_indexes | Indexes auf source_date, chat_id, is_favorite, processing_status |
+| 005 | add_people_field | people JSON-Array in memory_entries |
+| 006 | add_coordinates | latitude, longitude in memory_entries |
+| 007 | add_voice_speaker | voice_speaker TEXT NULL in media_attachments |
 
 ### Indexes
 
@@ -174,9 +188,19 @@ Alle `/api/*`-Endpunkte (außer `/api/auth/*`) sind durch `requireAuth` geschüt
 | `PUT` | `/api/memories/:id` | Text bearbeiten (`{cleaned_summary}`) |
 | `DELETE` | `/api/memories/:id` | Löscht Eintrag + alle zugehörigen Medien |
 | `POST` | `/api/memories/:id/favorite` | Favorit setzen/toggeln (`{is_favorite?}`) |
-| `POST` | `/api/memories/:id/photos` | Fotos hochladen (Multipart, max. 10 Dateien à 20 MB, nur `image/*`) |
+| `POST` | `/api/memories/:id/photos` | Fotos hochladen (Multipart, max. 10 Dateien à 50 MB, nur `image/*`) |
+| `POST` | `/api/memories/:id/audio` | Gespeicherte Audiodatei anhängen (`{filename, voice_speaker?}`) → `writeLimiter` |
+| `DELETE` | `/api/memories/:id/photos/:photoId` | Einzelnes Foto löschen |
+| `PATCH` | `/api/memories/:id/date` | Datum einer Erinnerung ändern (`{source_date}`) |
+| `PATCH` | `/api/memories/:id/person` | Kind-Name ändern (`{child_name}`) |
 | `GET` | `/api/children` | Distinct Kindernamen aus DB |
 | `GET` | `/api/locations` | Distinct Orte aus DB |
+
+### Transkription & Audio
+
+| Method | Pfad | Beschreibung |
+|---|---|---|
+| `POST` | `/api/transcribe` | Whisper-Transkription. Multipart: `audio` (Datei) + optionales `saveFile=true`. Wenn `saveFile=true`: Datei bleibt in `uploads/`, Response enthält `{ text, savedFilename }`. Ohne Flag: Datei wird nach Transkription gelöscht. `aiLimiter` (20/h). |
 
 ### Sonstiges
 
@@ -331,9 +355,9 @@ Nur diese Origins erlaubt:
 
 ### Stündlicher File-Cleanup
 
-- Sucht Dateien in `uploads/`, die keinen DB-Eintrag mehr haben
-- Löscht verwaiste Dateien (z.B. nach fehlgeschlagenem Upload)
-- Verhindert unbegrenztes Anwachsen des Upload-Verzeichnisses
+- `temp/`: Dateien älter als 2 Stunden werden gelöscht
+- `uploads/`: `voice_*`-Dateien älter als 24 Stunden werden gelöscht (verwaiste Transkriptions-Uploads, die nie einer Erinnerung zugeordnet wurden)
+- Fotos und andere Uploads werden nicht automatisch gelöscht
 
 ### Wöchentliche Zusammenfassung
 
@@ -371,10 +395,18 @@ Nur diese Origins erlaubt:
 ### Weitere Web-Funktionen
 
 - **Neue Erinnerung erstellen**: Modal mit Freitext, optionalem Kindname, Datum, Ort, Personen → KI-Zusammenfassung wird ausgelöst
+- **Audio hochladen**: `.m4a/.mp3/.ogg/.opus/.wav/.aac/.webm` → Whisper-Transkription → Text füllt Modal, Datei wird gespeichert
+- **Sprachnotiz mit Audio speichern**: Toggle "Mit Audio speichern" → Browser-Aufnahme wird ebenfalls als Datei gespeichert
+- **Speaker-Picker**: Wessen Stimme ist das? → Family-Member-Buttons + "Mehrere" (erscheint wenn Audio vorhanden)
+- **AudioPlayer**: Play/Pause, Fortschrittszeit, Speaker-Label (🎙️ Name) auf jeder Erinnerungskarte
+- **Speaker-Filter**: Filter-Chips nach Sprecher in der Hauptansicht (nur sichtbar wenn Erinnerungen mit Speaker-Tags vorhanden)
 - **Text bearbeiten**: Inline-Editing per Klick auf den Text
+- **Datum & Person ändern**: PATCH-Endpoints, editierbar aus der Karte
 - **Favorit toggeln**: Stern-Icon pro Erinnerung
 - **Fotos hochladen**: direkt in eine bestehende Erinnerung
-- **Bild-Lightbox**: Vollbild via React Portal (kein Stacking-Context-Problem), natürliches Seitenverhältnis
+- **Foto löschen**: einzelnes Foto aus einer Erinnerung entfernen
+- **Bild-Lightbox**: Vollbild via React Portal (kein Stacking-Context-Problem), natürliches Seitenverhältnis, Swipe-Navigation
+- **Identity Picker**: Familienmitglied nach Login auswählen (gespeichert in localStorage als `famories_identity`)
 - **PNG-Export**: Einzelne Erinnerungen als Bild exportieren (html2canvas)
 
 ### Design
@@ -429,9 +461,11 @@ Cron     → täglich 20:00                  → reminderService → Telegram-AP
 
 ## Bekannte Eigenheiten
 
-- **`web/dist/` im Git**: Änderungen am Frontend brauchen einen manuellen Build-Schritt + Commit
+- **`web/dist/` im Git**: Änderungen am Frontend brauchen `cd web && npm run build` + Commit
 - **In-Memory-State**: `pendingTranscriptions` und `chatLocations` gehen bei Server-Restart verloren
 - **Dead Code**: `MemoryCard.tsx`, `CardGrid.tsx`, `FilterBar.tsx` werden nicht importiert und vom Build tree-shaken
-- **Familienmitglieder an mehreren Stellen**: Definiert in `src/config/children.ts`, `src/config/speakers.ts`, `src/bot/telegramWebhook.ts` (für Bot-Registrierung) und `web/src/types/index.ts` (mit Farben für UI)
+- **Familienmitglieder an mehreren Stellen**: Definiert in `src/config/children.ts`, `src/config/speakers.ts`, `src/bot/telegramWebhook.ts` und `web/src/types/index.ts` (mit Farben für UI)
 - **Keine Pagination**: API gibt bis zu 1000 Einträge auf einmal zurück
 - **Rate-Limiting pro IP**: Hinter NAT teilen sich alle Nutzer ein Limit
+- **Speaker-Filter nur Client-seitig**: Der `?voice_speaker=` Query-Param in `GET /api/memories` existiert (server-seitig implementiert), wird aber vom Frontend nicht genutzt — der Filter läuft client-seitig über geladene Daten
+- **Audio-Upload Flow**: Datei → `POST /api/transcribe?saveFile=true` → `savedFilename` → Memory erstellen → `POST /api/memories/:id/audio` mit `{filename, voice_speaker}`. Orphaned `voice_*` Dateien werden nach 24h automatisch gelöscht.
