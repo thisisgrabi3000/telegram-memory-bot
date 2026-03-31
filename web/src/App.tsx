@@ -108,7 +108,7 @@ function App() {
     photos?: File[];
     latitude?: number;
     longitude?: number;
-  }) {
+  }): Promise<Memory> {
     const { photos, ...memoryData } = data;
     let created = await createMemory({ ...memoryData, recorded_by: identity || undefined });
 
@@ -117,6 +117,7 @@ function App() {
     }
 
     setMemories(prev => [created, ...prev]);
+    return created;
   }
 
   // Checking authentication - Premium loading state
