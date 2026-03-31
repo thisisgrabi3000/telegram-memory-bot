@@ -21,6 +21,7 @@ import {
   validateParams,
 } from './validation';
 import { requireAuth } from './authApi';
+import { compressImage } from '../services/imageCompressionService';
 
 /**
  * Sicheres JSON-Parsing mit Fallback.
@@ -47,7 +48,7 @@ const upload = multer({
       cb(null, `web_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
     },
   }),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB (compressed server-side)
   fileFilter: (_req, file, cb) => {
     cb(null, file.mimetype.startsWith('image/'));
   },
@@ -489,7 +490,7 @@ router.post('/memories/:id/favorite', writeLimiter, validateParams(idParamSchema
  * POST /api/memories/:id/photos
  * Lädt Fotos zu einer bestehenden Erinnerung hoch
  */
-router.post('/memories/:id/photos', writeLimiter, validateParams(idParamSchema), upload.array('photos', 10), (req, res) => {
+router.post('/memories/:id/photos', writeLimiter, validateParams(idParamSchema), upload.array('photos', 10), async (req, res) => {
   try {
     const { id } = req.params as unknown as { id: number };
 
@@ -503,12 +504,15 @@ router.post('/memories/:id/photos', writeLimiter, validateParams(idParamSchema),
       return res.status(400).json({ success: false, error: 'Keine Dateien hochgeladen' });
     }
 
+    const uploadsDir = path.resolve('./uploads');
     for (const file of files) {
+      const filePath = path.join(uploadsDir, file.filename);
+      const compressedFilename = await compressImage(filePath);
       mediaRepository.create({
         memory_entry_id: id,
         media_type: 'photo',
-        telegram_file_id: `web_${file.filename}`,
-        local_path: file.filename,
+        telegram_file_id: `web_${compressedFilename}`,
+        local_path: compressedFilename,
       });
     }
 
