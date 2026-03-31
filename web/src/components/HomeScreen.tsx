@@ -6,13 +6,14 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, X, Calendar, User, MessageCircle, Image as ImageIcon,
   Pencil, Check, Trash2, Search, MapPin, Star, Plus, Mic, Heart,
   Sparkles, SlidersHorizontal, Camera, Settings, HelpCircle,
-  Type, Contrast, Link2, Map, List, Clock
+  Type, Contrast, Link2, Map, List, Clock, AudioLines
 } from 'lucide-react';
 import type { Memory } from '../types';
 import { FAMILY_MEMBERS, LOCATIONS } from '../types';
 import { CreateMemoryModal } from './CreateMemoryModal';
 import { MapView } from './MapView';
 import { HorizontalTimeline } from './HorizontalTimeline';
+import { AudioPlayer } from './AudioPlayer';
 
 interface HomeScreenProps {
   memories: Memory[];
@@ -30,7 +31,7 @@ interface HomeScreenProps {
     photos?: File[];
     latitude?: number;
     longitude?: number;
-  }) => Promise<void>;
+  }) => Promise<Memory>;
   onDeletePhoto?: (memoryId: number, photoId: number) => Promise<void>;
   identity?: string | null;
   onIdentityReset?: () => void;
@@ -80,6 +81,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
   const [personFilter, setPersonFilter] = useState<string>('Alle');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('7d');
   const [locationFilter, setLocationFilter] = useState<string>('Alle');
+  const [speakerFilter, setSpeakerFilter] = useState<string>('Alle');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -223,6 +225,14 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
     [timeFilter, customStartDate, customEndDate]
   );
 
+  const availableSpeakers = useMemo(() => {
+    const speakers = new Set<string>();
+    memories.forEach(m => m.audios.forEach(a => {
+      if (a.voice_speaker) speakers.add(a.voice_speaker);
+    }));
+    return Array.from(speakers);
+  }, [memories]);
+
   // Helper to highlight search terms
   const highlightText = (text: string, query: string) => {
     if (!query.trim()) return text;
@@ -243,7 +253,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
 
   // Filter memories by all criteria
   const filteredMemories = useMemo(() => {
-    return memories.filter(memory => {
+    let filteredMemories = memories.filter(memory => {
       const date = parseISO(memory.source_date);
       const inTimeRange = isWithinInterval(date, { start: timeRange.start, end: timeRange.end });
 
@@ -271,7 +281,13 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
 
       return inTimeRange && matchesPerson && matchesLocation && matchesFavorites && matchesSearch;
     });
-  }, [memories, personFilter, locationFilter, showFavoritesOnly, searchQuery, timeRange]);
+    if (speakerFilter !== 'Alle') {
+      filteredMemories = filteredMemories.filter(m =>
+        m.audios.some(a => a.voice_speaker === speakerFilter)
+      );
+    }
+    return filteredMemories;
+  }, [memories, personFilter, locationFilter, showFavoritesOnly, searchQuery, timeRange, speakerFilter]);
 
   // Separate text entries (messages) from photo entries
   const textEntries = useMemo(() => {
@@ -746,6 +762,27 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
               {filteredMemories.length} {filteredMemories.length === 1 ? 'Erinnerung' : 'Erinnerungen'}
             </span>
           </div>
+
+          {/* Speaker filter chips */}
+          {availableSpeakers.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {['Alle', ...availableSpeakers].map(speaker => (
+                <button
+                  key={speaker}
+                  onClick={() => setSpeakerFilter(speaker)}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200"
+                  style={{
+                    backgroundColor: speakerFilter === speaker ? 'var(--color-terracotta-500)' : 'white',
+                    color: speakerFilter === speaker ? 'white' : 'var(--color-text-muted)',
+                    border: speakerFilter === speaker ? 'none' : '1px solid var(--color-sand-200)',
+                  }}
+                >
+                  <AudioLines className="w-3 h-3" />
+                  {speaker}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col">
@@ -890,6 +927,12 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                               {memory.location}
                             </span>
                           )}
+                          {memory.audios.length > 0 && (
+                            <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-terracotta-400)' }}>
+                              <AudioLines className="w-3 h-3" />
+                              {memory.audios.length > 1 ? `${memory.audios.length} Aufnahmen` : '1 Aufnahme'}
+                            </span>
+                          )}
                           {editingDateId === memory.id ? (
                             <div className="ml-auto flex items-center gap-1" onClick={e => e.stopPropagation()}>
                               <input
@@ -1000,18 +1043,16 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                                 {searchQuery ? highlightText(memory.cleaned_summary, searchQuery) : memory.cleaned_summary}
                               </p>
                             )}
-                            {/* Audio Player */}
-                            {memory.audios && memory.audios.length > 0 && (
-                              <div className="mt-3 flex items-center gap-2 p-2 rounded-xl" style={{ backgroundColor: 'rgba(232,107,63,0.05)' }}>
-                                <Mic className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-terracotta-500)' }} />
-                                <audio
-                                  controls
-                                  className="h-8 flex-1"
-                                  style={{ maxWidth: '100%' }}
-                                >
-                                  <source src={memory.audios[0].url} type="audio/ogg" />
-                                  Dein Browser unterstützt keine Audio-Wiedergabe.
-                                </audio>
+                            {/* Audio Players */}
+                            {memory.audios.length > 0 && (
+                              <div className="mt-3 space-y-2">
+                                {memory.audios.map(audio => (
+                                  <AudioPlayer
+                                    key={audio.id}
+                                    url={audio.url}
+                                    voiceSpeaker={audio.voice_speaker}
+                                  />
+                                ))}
                               </div>
                             )}
                           </>
