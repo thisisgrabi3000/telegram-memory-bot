@@ -411,7 +411,7 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
                 setAudioBlob(blob);
                 if (!blob) { setSaveVoiceAudio(false); setVoiceSpeaker(null); }
               }}
-              showSaveToggle={true}
+              showSaveToggle={!pendingAudioFilename}
               onSaveAudioChange={(save) => {
                 setSaveVoiceAudio(save);
                 if (!save) setVoiceSpeaker(null);

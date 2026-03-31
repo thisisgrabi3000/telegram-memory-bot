@@ -49,8 +49,11 @@ export function AudioPlayer({ url, voiceSpeaker, className }: AudioPlayerProps) 
       audio.pause();
       setIsPlaying(false);
     } else {
-      audio.play();
-      setIsPlaying(true);
+      audio.play().then(() => {
+        setIsPlaying(true);
+      }).catch(() => {
+        // Playback blocked or failed — don't update state
+      });
     }
   }
 

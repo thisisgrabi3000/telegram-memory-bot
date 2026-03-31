@@ -49,7 +49,7 @@ const upload = multer({
   }),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
   fileFilter: (_req, file, cb) => {
-    cb(null, file.mimetype.startsWith('image/') || file.mimetype.startsWith('audio/'));
+    cb(null, file.mimetype.startsWith('image/'));
   },
 });
 
@@ -540,7 +540,12 @@ router.post('/memories/:id/audio', writeLimiter, validateParams(idParamSchema), 
     }
 
     // Verify file exists (prevents path traversal; regex already blocks '..')
-    const filePath = path.resolve('./uploads', filename);
+    const uploadsDir = path.resolve('./uploads');
+    const filePath = path.resolve(uploadsDir, filename);
+    // Guard: ensure resolved path stays inside uploads/
+    if (!filePath.startsWith(uploadsDir + path.sep)) {
+      return res.status(400).json({ success: false, error: 'Ungültiger Dateiname' });
+    }
     if (!fs.existsSync(filePath)) {
       return res.status(400).json({ success: false, error: 'Audiodatei nicht gefunden' });
     }
