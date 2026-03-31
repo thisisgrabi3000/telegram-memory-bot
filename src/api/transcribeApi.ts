@@ -45,6 +45,8 @@ router.post('/transcribe', aiLimiter, audioUpload.single('audio'), async (req, r
     return res.status(400).json({ success: false, error: 'Keine Audiodatei hochgeladen' });
   }
 
+  const saveFile = req.body.saveFile === 'true';
+
   try {
     const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
@@ -54,15 +56,24 @@ router.post('/transcribe', aiLimiter, audioUpload.single('audio'), async (req, r
       language: 'de',
     });
 
-    // Delete temp file after transcription
-    fs.unlinkSync(file.path);
+    if (!saveFile) {
+      fs.unlinkSync(file.path);
+    }
+
+    const responseData: { text: string; savedFilename?: string } = {
+      text: transcription.text,
+    };
+
+    if (saveFile) {
+      responseData.savedFilename = file.filename;
+    }
 
     res.json({
       success: true,
-      data: { text: transcription.text },
+      data: responseData,
     });
   } catch (error) {
-    // Clean up temp file on error
+    // Clean up file on error regardless of saveFile flag
     if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
 
     console.error('Transcription error:', error);
