@@ -13,19 +13,21 @@ export const mediaRepository = {
     media_type: 'photo' | 'audio' | 'video';
     telegram_file_id: string;
     local_path: string;
+    voice_speaker?: string | null;
   }): MediaAttachment {
     const db = getDatabase();
 
     const stmt = db.prepare(`
-      INSERT INTO media_attachments (memory_entry_id, media_type, telegram_file_id, local_path)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO media_attachments (memory_entry_id, media_type, telegram_file_id, local_path, voice_speaker)
+      VALUES (?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
       attachment.memory_entry_id,
       attachment.media_type,
       attachment.telegram_file_id,
-      attachment.local_path
+      attachment.local_path,
+      attachment.voice_speaker ?? null
     );
 
     return this.findById(result.lastInsertRowid as number)!;
@@ -87,5 +89,19 @@ export const mediaRepository = {
     const stmt = db.prepare('DELETE FROM media_attachments WHERE memory_entry_id = ?');
     const result = stmt.run(memoryEntryId);
     return result.changes;
+  },
+
+  /**
+   * Findet alle Memory-Einträge mit Audio-Dateien für einen bestimmten Sprecher
+   */
+  findByVoiceSpeaker(speaker: string): number[] {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+      SELECT DISTINCT memory_entry_id
+      FROM media_attachments
+      WHERE media_type = 'audio' AND voice_speaker = ?
+    `);
+    const rows = stmt.all(speaker) as Array<{ memory_entry_id: number }>;
+    return rows.map(r => r.memory_entry_id);
   },
 };

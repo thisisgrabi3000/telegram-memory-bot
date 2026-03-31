@@ -92,6 +92,7 @@ export interface MediaAttachment {
   telegram_file_id: string;
   local_path: string | null;
   created_at: string;
+  voice_speaker: string | null;
 }
 
 /**
