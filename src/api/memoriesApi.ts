@@ -505,9 +505,12 @@ router.post('/memories/:id/photos', writeLimiter, validateParams(idParamSchema),
     }
 
     const uploadsDir = path.resolve('./uploads');
+    const compressedFilenames: string[] = [];
     for (const file of files) {
       const filePath = path.join(uploadsDir, file.filename);
-      const compressedFilename = await compressImage(filePath);
+      compressedFilenames.push(await compressImage(filePath));
+    }
+    for (const compressedFilename of compressedFilenames) {
       mediaRepository.create({
         memory_entry_id: id,
         media_type: 'photo',
