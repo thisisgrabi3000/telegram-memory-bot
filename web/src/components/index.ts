@@ -5,3 +5,4 @@ export { MapView } from './MapView';
 export { LocationAutocomplete } from './LocationAutocomplete';
 export { IdentityPicker } from './IdentityPicker';
 export { HorizontalTimeline } from './HorizontalTimeline';
+export { AudioPlayer } from './AudioPlayer';
