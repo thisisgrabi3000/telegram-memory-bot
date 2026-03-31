@@ -29,9 +29,10 @@ export const fileCleanupService = {
    * Räumt alte Dateien in einem Verzeichnis auf.
    * @param directory - Verzeichnis zum Aufräumen
    * @param maxAgeMs - Maximales Alter in Millisekunden
+   * @param filePattern - Optionales Muster zum Filtern von Dateien
    * @returns Anzahl gelöschter Dateien
    */
-  async cleanupOldFiles(directory: string, maxAgeMs: number): Promise<number> {
+  async cleanupOldFiles(directory: string, maxAgeMs: number, filePattern?: RegExp): Promise<number> {
     const absolutePath = path.resolve(directory);
 
     if (!fs.existsSync(absolutePath)) {
@@ -45,6 +46,9 @@ export const fileCleanupService = {
       const files = fs.readdirSync(absolutePath);
 
       for (const file of files) {
+        // Skip files that don't match the pattern (if one is provided)
+        if (filePattern && !filePattern.test(file)) continue;
+
         const filePath = path.join(absolutePath, file);
 
         try {
@@ -85,6 +89,10 @@ export const fileCleanupService = {
 
       // Temp-Verzeichnis: Dateien älter als 2 Stunden
       const tempDeleted = await this.cleanupOldFiles('./temp', TWO_HOURS);
+
+      // Orphaned voice files in uploads/ older than 24 hours
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+      await this.cleanupOldFiles('./uploads', TWENTY_FOUR_HOURS, /^voice_/);
 
       if (tempDeleted > 0) {
         console.log(`🧹 Cleanup abgeschlossen: ${tempDeleted} Temp-Dateien gelöscht`);
