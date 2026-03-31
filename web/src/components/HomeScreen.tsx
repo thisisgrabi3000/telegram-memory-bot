@@ -1478,11 +1478,104 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                 )}
               </div>
             </div>
-            {lightboxImage.memory.cleaned_summary && (
-              <p style={{ marginTop: '0.75rem', fontSize: '0.8rem', lineHeight: 1.5, color: 'rgba(255,255,255,0.75)' }}>
-                {lightboxImage.memory.cleaned_summary}
-              </p>
-            )}
+            {/* Text display / edit */}
+            <div style={{ marginTop: '0.75rem' }} onClick={e => e.stopPropagation()}>
+              {lightboxEditMode ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <textarea
+                    value={lightboxEditText}
+                    onChange={e => setLightboxEditText(e.target.value)}
+                    autoFocus
+                    disabled={lightboxIsSaving}
+                    rows={4}
+                    placeholder="Text eingeben..."
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 0.75rem',
+                      borderRadius: '0.6rem',
+                      border: '1px solid rgba(255,255,255,0.3)',
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                      color: 'white',
+                      fontSize: '0.85rem',
+                      lineHeight: 1.5,
+                      resize: 'vertical',
+                      boxSizing: 'border-box',
+                      fontFamily: 'inherit',
+                      outline: 'none',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => { setLightboxEditMode(false); setLightboxEditText(''); }}
+                      disabled={lightboxIsSaving}
+                      style={{
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        backgroundColor: 'rgba(255,255,255,0.15)',
+                        color: 'white',
+                      }}
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      onClick={handleLightboxSave}
+                      disabled={lightboxIsSaving || lightboxEditText.trim() === ''}
+                      style={{
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        backgroundColor: 'rgba(255,255,255,0.9)',
+                        color: '#1a1a1a',
+                        opacity: (lightboxIsSaving || lightboxEditText.trim() === '') ? 0.5 : 1,
+                      }}
+                    >
+                      {lightboxIsSaving ? 'Speichern...' : 'Speichern'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  {lightboxImage.memory.cleaned_summary ? (
+                    <p style={{ flex: 1, margin: 0, fontSize: '0.8rem', lineHeight: 1.5, color: 'rgba(255,255,255,0.75)' }}>
+                      {lightboxImage.memory.cleaned_summary}
+                    </p>
+                  ) : (
+                    <p style={{ flex: 1, margin: 0, fontSize: '0.8rem', lineHeight: 1.5, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>
+                      Kein Text vorhanden
+                    </p>
+                  )}
+                  {onUpdate && (
+                    <button
+                      onClick={() => {
+                        setLightboxEditText(lightboxImage.memory.cleaned_summary || '');
+                        setLightboxEditMode(true);
+                      }}
+                      title="Text bearbeiten"
+                      style={{
+                        flexShrink: 0,
+                        padding: '0.25rem',
+                        borderRadius: '0.4rem',
+                        border: 'none',
+                        cursor: 'pointer',
+                        backgroundColor: 'rgba(255,255,255,0.12)',
+                        color: 'rgba(255,255,255,0.6)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Pencil style={{ width: '0.9rem', height: '0.9rem' }} />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             {photoDeleteConfirm && onDeletePhoto && (
               <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
                 <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
