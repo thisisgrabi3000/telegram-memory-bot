@@ -90,6 +90,10 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
   const [lightboxTouchStartX, setLightboxTouchStartX] = useState(0);
   const [photoDeleteConfirm, setPhotoDeleteConfirm] = useState(false);
   const [deletingPhoto, setDeletingPhoto] = useState(false);
+  // Lightbox text edit state
+  const [lightboxEditMode, setLightboxEditMode] = useState(false);
+  const [lightboxEditText, setLightboxEditText] = useState('');
+  const [lightboxIsSaving, setLightboxIsSaving] = useState(false);
   const [visibleImages, setVisibleImages] = useState(24);
 
   // Accessibility settings
@@ -151,6 +155,23 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
     setLightboxImage({ memory: lightboxImage.memory, photoIndex: (lightboxImage.photoIndex - 1 + total) % total });
   }
 
+  // Reset edit state when lightbox closes
+  useEffect(() => {
+    if (!lightboxImage) {
+      setLightboxEditMode(false);
+      setLightboxEditText('');
+    }
+  }, [lightboxImage]);
+
+  // Sync lightboxImage.memory when memories state updates (e.g. after save)
+  useEffect(() => {
+    if (!lightboxImage) return;
+    const updated = memories.find(m => m.id === lightboxImage.memory.id);
+    if (updated && updated !== lightboxImage.memory) {
+      setLightboxImage(prev => prev ? { ...prev, memory: updated } : null);
+    }
+  }, [memories]);
+
   // Keyboard handler for lightbox
   useEffect(() => {
     if (!lightboxImage) return;
@@ -205,6 +226,19 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditText('');
+  };
+
+  const handleLightboxSave = async () => {
+    if (!onUpdate || !lightboxImage || lightboxEditText.trim() === '') return;
+    setLightboxIsSaving(true);
+    try {
+      await onUpdate(lightboxImage.memory.id, lightboxEditText.trim());
+      setLightboxEditMode(false);
+    } catch (err) {
+      console.error('Fehler beim Speichern des Lightbox-Textes:', err);
+    } finally {
+      setLightboxIsSaving(false);
+    }
   };
 
   const handleDeleteConfirm = async (id: number) => {
