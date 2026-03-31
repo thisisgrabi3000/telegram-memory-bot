@@ -181,11 +181,19 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
     function handleKey(e: KeyboardEvent) {
       if (e.key === 'ArrowRight') lightboxGoNext();
       else if (e.key === 'ArrowLeft') lightboxGoPrev();
-      else if (e.key === 'Escape') { setLightboxImage(null); setPhotoDeleteConfirm(false); }
+      else if (e.key === 'Escape') {
+        if (lightboxEditMode) {
+          setLightboxEditMode(false);
+          setLightboxEditText('');
+        } else {
+          setLightboxImage(null);
+          setPhotoDeleteConfirm(false);
+        }
+      }
     }
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [lightboxImage]);
+  }, [lightboxImage, lightboxEditMode, lightboxEditText]);
 
   // Accessibility handlers
   const handleFontSizeChange = (size: FontSize) => {
@@ -237,6 +245,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
     try {
       await onUpdate(lightboxImage.memory.id, lightboxEditText.trim());
       setLightboxEditMode(false);
+      setLightboxEditText('');
     } catch (err) {
       console.error('Fehler beim Speichern des Lightbox-Textes:', err);
     } finally {
