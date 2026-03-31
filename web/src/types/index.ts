@@ -78,6 +78,7 @@ export interface Audio {
   id: number;
   url: string;
   filename: string;
+  voice_speaker: string | null;
 }
 
 export interface Video {
