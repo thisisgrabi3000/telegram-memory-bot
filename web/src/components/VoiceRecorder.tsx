@@ -4,13 +4,16 @@ import { Mic, Square, Play, Pause, Trash2 } from 'lucide-react';
 interface VoiceRecorderProps {
   onRecordingChange: (blob: Blob | null) => void;
   disabled?: boolean;
+  showSaveToggle?: boolean;
+  onSaveAudioChange?: (save: boolean) => void;
 }
 
-export function VoiceRecorder({ onRecordingChange, disabled }: VoiceRecorderProps) {
+export function VoiceRecorder({ onRecordingChange, disabled, showSaveToggle, onSaveAudioChange }: VoiceRecorderProps) {
   const [state, setState] = useState<'idle' | 'recording' | 'recorded'>('idle');
   const [elapsed, setElapsed] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveAudio, setSaveAudio] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -98,6 +101,8 @@ export function VoiceRecorder({ onRecordingChange, disabled }: VoiceRecorderProp
     onRecordingChange(null);
     setState('idle');
     setElapsed(0);
+    setSaveAudio(false);
+    onSaveAudioChange?.(false);
   }
 
   function togglePlayback() {
@@ -186,36 +191,57 @@ export function VoiceRecorder({ onRecordingChange, disabled }: VoiceRecorderProp
   // RECORDED state
   return (
     <div
-      className="flex items-center gap-3 px-4 py-3 rounded-xl"
+      className="flex flex-col gap-2 px-4 py-3 rounded-xl"
       style={{ backgroundColor: 'var(--color-sand-50)', border: '1px solid var(--color-sand-200)' }}
     >
-      <button
-        type="button"
-        onClick={togglePlayback}
-        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl transition-all hover:scale-105"
-        style={{ backgroundColor: 'var(--color-terracotta-500)' }}
-      >
-        {isPlaying
-          ? <Pause className="w-4 h-4 text-white" />
-          : <Play className="w-4 h-4 text-white" style={{ marginLeft: '2px' }} />
-        }
-      </button>
-      <div className="flex-1">
-        <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-          Sprachnotiz
-        </span>
-        <span className="text-xs ml-2" style={{ color: 'var(--color-text-muted)' }}>
-          {formatTime(elapsed)}
-        </span>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={togglePlayback}
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl transition-all hover:scale-105"
+          style={{ backgroundColor: 'var(--color-terracotta-500)' }}
+        >
+          {isPlaying
+            ? <Pause className="w-4 h-4 text-white" />
+            : <Play className="w-4 h-4 text-white" style={{ marginLeft: '2px' }} />
+          }
+        </button>
+        <div className="flex-1">
+          <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            Sprachnotiz
+          </span>
+          <span className="text-xs ml-2" style={{ color: 'var(--color-text-muted)' }}>
+            {formatTime(elapsed)}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={deleteRecording}
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl transition-all hover:scale-105"
+          style={{ backgroundColor: 'rgba(220, 38, 38, 0.08)' }}
+        >
+          <Trash2 className="w-4 h-4" style={{ color: '#dc2626' }} />
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={deleteRecording}
-        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl transition-all hover:scale-105"
-        style={{ backgroundColor: 'rgba(220, 38, 38, 0.08)' }}
-      >
-        <Trash2 className="w-4 h-4" style={{ color: '#dc2626' }} />
-      </button>
+      {showSaveToggle && (
+        <button
+          type="button"
+          onClick={() => {
+            const next = !saveAudio;
+            setSaveAudio(next);
+            onSaveAudioChange?.(next);
+          }}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 self-start"
+          style={{
+            backgroundColor: saveAudio ? 'var(--color-terracotta-500)' : 'var(--color-sand-100)',
+            color: saveAudio ? 'white' : 'var(--color-text-muted)',
+            border: saveAudio ? 'none' : '1px solid var(--color-sand-200)',
+          }}
+        >
+          <span>🎵</span>
+          Mit Audio speichern
+        </button>
+      )}
     </div>
   );
 }
