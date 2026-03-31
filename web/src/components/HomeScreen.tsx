@@ -170,7 +170,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
     if (updated && updated !== lightboxImage.memory) {
       setLightboxImage(prev => prev ? { ...prev, memory: updated } : null);
     }
-  }, [memories]);
+  }, [memories, lightboxImage]);
 
   // Keyboard handler for lightbox
   useEffect(() => {
