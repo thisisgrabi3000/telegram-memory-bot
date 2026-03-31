@@ -15,6 +15,7 @@ import {
   memoriesQuerySchema,
   idParamSchema,
   photoParamSchema,
+  audioAttachSchema,
   validateBody,
   validateQuery,
   validateParams,
@@ -525,6 +526,47 @@ router.post('/memories/:id/photos', writeLimiter, validateParams(idParamSchema),
 });
 
 /**
+ * POST /api/memories/:id/audio
+ * Attaches a previously saved audio file to a memory entry
+ */
+router.post('/memories/:id/audio', writeLimiter, validateParams(idParamSchema), validateBody(audioAttachSchema), (req, res) => {
+  try {
+    const { id } = req.params as unknown as { id: number };
+    const { filename, voice_speaker } = req.body as { filename: string; voice_speaker?: string | null };
+
+    const memory = memoryRepository.findById(id);
+    if (!memory) {
+      return res.status(404).json({ success: false, error: 'Erinnerung nicht gefunden' });
+    }
+
+    // Verify file exists (prevents path traversal; regex already blocks '..')
+    const filePath = path.resolve('./uploads', filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(400).json({ success: false, error: 'Audiodatei nicht gefunden' });
+    }
+
+    mediaRepository.create({
+      memory_entry_id: id,
+      media_type: 'audio',
+      telegram_file_id: `web_${filename}`,
+      local_path: filename,
+      voice_speaker: voice_speaker ?? null,
+    });
+
+    const attachments = mediaRepository.findByMemoryId(id);
+    const updatedMemory = memoryRepository.findById(id);
+
+    res.json({
+      success: true,
+      data: transformMemory(updatedMemory!, attachments),
+    });
+  } catch (error) {
+    console.error('API Error:', error);
+    res.status(500).json({ success: false, error: 'Fehler beim Anhängen der Audiodatei' });
+  }
+});
+
+/**
  * DELETE /api/memories/:id/photos/:photoId
  * Löscht ein einzelnes Foto aus einer Erinnerung
  */
@@ -637,6 +679,7 @@ function transformMemory(entry: MemoryEntry, attachments: MediaAttachment[]) {
         id: a.id,
         url: `/uploads/${a.local_path}`,
         filename: a.local_path,
+        voice_speaker: a.voice_speaker ?? null,
       })),
     videos: attachments
       .filter(a => a.media_type === 'video')
