@@ -219,7 +219,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [textEntries]);
+  }, [textEntries, visibleEntries]);
 
   // Auto-load more photos as user scrolls to the sentinel below the grid
   useEffect(() => {
@@ -1221,7 +1221,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                     );
                   })
                 )}
-                <div ref={textSentinelRef} />
+                {visibleEntries < textEntries.length && <div ref={textSentinelRef} />}
               </div>
             </div>
         </div>
