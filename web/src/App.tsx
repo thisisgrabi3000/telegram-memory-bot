@@ -34,6 +34,11 @@ function App() {
       const res = await fetch(`${API_BASE_URL}/api/auth/status`, { credentials: 'include' });
       const data = await res.json();
       setIsAuthenticated(!data.passwordRequired || data.authenticated);
+      if (data.identity) {
+        // Session has identity — use it and sync to localStorage
+        localStorage.setItem('famories_identity', data.identity);
+        setIdentity(data.identity);
+      }
     } catch {
       setIsAuthenticated(false);
     } finally {
@@ -48,11 +53,23 @@ function App() {
   function handleIdentitySelect(name: string) {
     localStorage.setItem('famories_identity', name);
     setIdentity(name);
+    fetch(`${API_BASE_URL}/api/auth/identity`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ identity: name }),
+    }).catch(() => {/* non-critical */});
   }
 
   function handleIdentityReset() {
     localStorage.removeItem('famories_identity');
     setIdentity(null);
+    fetch(`${API_BASE_URL}/api/auth/identity`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ identity: null }),
+    }).catch(() => {/* non-critical */});
   }
 
   async function loadMemories() {
