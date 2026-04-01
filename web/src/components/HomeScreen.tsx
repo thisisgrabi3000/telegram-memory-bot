@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { format, parseISO, subDays, subHours, startOfYear, isWithinInterval } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -95,6 +95,10 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
   const [lightboxEditText, setLightboxEditText] = useState('');
   const [lightboxIsSaving, setLightboxIsSaving] = useState(false);
   const [visibleImages, setVisibleImages] = useState(24);
+  const [visibleEntries, setVisibleEntries] = useState(20);
+  const textScrollRef = useRef<HTMLDivElement>(null);
+  const textSentinelRef = useRef<HTMLDivElement>(null);
+  const photoSentinelRef = useRef<HTMLDivElement>(null);
 
   // Accessibility settings
   const [fontSize, setFontSize] = useState<FontSize>(() => {
@@ -193,7 +197,45 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
     }
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [lightboxImage, lightboxEditMode, lightboxEditText]);
+  }, [lightboxImage, lightboxEditMode]);
+
+  // Reset visible count when filtered list changes (e.g. user changes a filter)
+  useEffect(() => {
+    setVisibleEntries(20);
+  }, [textEntries]);
+
+  // Auto-load more text entries as user scrolls to the bottom of the feed
+  useEffect(() => {
+    const root = textScrollRef.current;
+    const sentinel = textSentinelRef.current;
+    if (!root || !sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleEntries(prev => prev < textEntries.length ? prev + 20 : prev);
+        }
+      },
+      { root, threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [textEntries]);
+
+  // Auto-load more photos as user scrolls to the sentinel below the grid
+  useEffect(() => {
+    const sentinel = photoSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleImages(prev => prev < memoryPhotoGroups.length ? prev + 24 : prev);
+        }
+      },
+      { threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [memoryPhotoGroups.length]);
 
   // Accessibility handlers
   const handleFontSizeChange = (size: FontSize) => {
@@ -864,7 +906,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
               </div>
 
               {/* Messages */}
-              <div className="p-4 space-y-3 max-h-[28rem] overflow-y-auto scrollbar-thin">
+              <div ref={textScrollRef} className="p-4 space-y-3 max-h-[28rem] overflow-y-auto scrollbar-thin">
                 {textEntries.length === 0 ? (
                   <div className="text-center py-12 px-4">
                     <div
@@ -878,7 +920,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                     </p>
                   </div>
                 ) : (
-                  textEntries.slice(0, 10).map((memory, index) => {
+                  textEntries.slice(0, visibleEntries).map((memory, index) => {
                     const authorName = memory.recorded_by || memory.child_name || 'Unbekannt';
                     const authorColor = getMemberColor(authorName);
                     const isEditing = editingId === memory.id;
@@ -1179,6 +1221,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                     );
                   })
                 )}
+                <div ref={textSentinelRef} />
               </div>
             </div>
         </div>
@@ -1289,30 +1332,15 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                 })}
               </div>
 
-              {/* Load More Button */}
-              {visibleImages < memoryPhotoGroups.length && (
-                <div className="text-center mt-10">
-                  <button
-                    onClick={() => setVisibleImages(prev => prev + 24)}
-                    className="group inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105"
-                    style={{
-                      background: 'var(--glass-bg-strong)',
-                      border: '2px solid var(--color-sand-300)',
-                      color: 'var(--color-text-primary)',
-                      boxShadow: 'var(--shadow-md)',
-                    }}
-                  >
-                    <ImageIcon className="w-5 h-5 transition-transform group-hover:scale-110" style={{ color: 'var(--color-sage-500)' }} />
-                    <span>Mehr laden</span>
-                    <span
-                      className="px-2 py-0.5 rounded-full text-sm"
-                      style={{ backgroundColor: 'var(--color-sand-200)' }}
-                    >
-                      {memoryPhotoGroups.length - visibleImages}
-                    </span>
-                  </button>
-                </div>
-              )}
+              {/* Infinite scroll sentinel — always rendered so the observer always has a target */}
+              <div ref={photoSentinelRef} className="mt-6 h-8 flex items-center justify-center">
+                {visibleImages < memoryPhotoGroups.length && (
+                  <div
+                    className="w-5 h-5 rounded-full border-2 animate-spin"
+                    style={{ borderColor: 'var(--color-sand-200)', borderTopColor: 'var(--color-terracotta-400)' }}
+                  />
+                )}
+              </div>
             </>
           )}
         </section>
