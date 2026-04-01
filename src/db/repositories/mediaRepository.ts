@@ -114,4 +114,14 @@ export const mediaRepository = {
     const result = stmt.run(speaker, id);
     return result.changes > 0;
   },
+
+  /**
+   * Aktualisiert die Personen-Tags eines Fotos
+   */
+  updatePhotoPeople(id: number, people: string[]): boolean {
+    const db = getDatabase();
+    const stmt = db.prepare('UPDATE media_attachments SET photo_people = ? WHERE id = ?');
+    const result = stmt.run(JSON.stringify(people), id);
+    return result.changes > 0;
+  },
 };

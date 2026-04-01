@@ -93,6 +93,7 @@ export interface MediaAttachment {
   local_path: string | null;
   created_at: string;
   voice_speaker: string | null;
+  photo_people: string | null;
 }
 
 /**
