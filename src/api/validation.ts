@@ -155,7 +155,7 @@ export const audioParamSchema = z.object({
  * Schema für PATCH /memories/:id/audios/:audioId/speaker
  */
 export const updateSpeakerSchema = z.object({
-  voice_speaker: z.string().max(MAX_NAME_LENGTH).optional().nullable(),
+  voice_speaker: z.string().max(MAX_NAME_LENGTH).nullable(),
 });
 
 /**

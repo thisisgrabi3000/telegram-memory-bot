@@ -33,6 +33,8 @@ interface HomeScreenProps {
     longitude?: number;
   }) => Promise<Memory>;
   onDeletePhoto?: (memoryId: number, photoId: number) => Promise<void>;
+  onDeleteAudio?: (memoryId: number, audioId: number) => Promise<void>;
+  onUpdateAudioSpeaker?: (memoryId: number, audioId: number, speaker: string | null) => Promise<void>;
   identity?: string | null;
   onIdentityReset?: () => void;
 }
@@ -77,7 +79,7 @@ const FONT_SIZE_CLASSES: Record<FontSize, string> = {
   xlarge: 'font-xlarge',
 };
 
-export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, onDelete, onToggleFavorite, onCreate, onDeletePhoto, identity, onIdentityReset }: HomeScreenProps) {
+export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, onDelete, onToggleFavorite, onCreate, onDeletePhoto, onDeleteAudio, onUpdateAudioSpeaker, identity, onIdentityReset }: HomeScreenProps) {
   const [personFilter, setPersonFilter] = useState<string>('Alle');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('7d');
   const [locationFilter, setLocationFilter] = useState<string>('Alle');
@@ -1137,8 +1139,11 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                                 {memory.audios.map(audio => (
                                   <AudioPlayer
                                     key={audio.id}
+                                    id={audio.id}
                                     url={audio.url}
                                     voiceSpeaker={audio.voice_speaker}
+                                    onDelete={onDeleteAudio ? (audioId) => onDeleteAudio(memory.id, audioId) : undefined}
+                                    onUpdateSpeaker={onUpdateAudioSpeaker ? (audioId, speaker) => onUpdateAudioSpeaker(memory.id, audioId, speaker) : undefined}
                                   />
                                 ))}
                               </div>

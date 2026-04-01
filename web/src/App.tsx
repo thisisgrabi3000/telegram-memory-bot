@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HomeScreen, LoginScreen, IdentityPicker } from './components';
-import { fetchMemories, updateMemory, updateMemoryDate, updateMemoryPerson, deleteMemory, toggleFavorite, createMemory, uploadPhotos, deletePhoto } from './api/memoriesApi';
+import { fetchMemories, updateMemory, updateMemoryDate, updateMemoryPerson, deleteMemory, toggleFavorite, createMemory, uploadPhotos, deletePhoto, deleteAudio, updateAudioSpeaker } from './api/memoriesApi';
 import type { Memory } from './types';
 import { Loader2, Heart, RefreshCw, AlertTriangle } from 'lucide-react';
 
@@ -96,6 +96,16 @@ function App() {
 
   async function handleDeletePhoto(memoryId: number, photoId: number) {
     const updated = await deletePhoto(memoryId, photoId);
+    setMemories(prev => prev.map(m => m.id === memoryId ? updated : m));
+  }
+
+  async function handleDeleteAudio(memoryId: number, audioId: number) {
+    const updated = await deleteAudio(memoryId, audioId);
+    setMemories(prev => prev.map(m => m.id === memoryId ? updated : m));
+  }
+
+  async function handleUpdateAudioSpeaker(memoryId: number, audioId: number, speaker: string | null) {
+    const updated = await updateAudioSpeaker(memoryId, audioId, speaker);
     setMemories(prev => prev.map(m => m.id === memoryId ? updated : m));
   }
 
@@ -314,6 +324,8 @@ function App() {
       onToggleFavorite={handleToggleFavorite}
       onCreate={handleCreate}
       onDeletePhoto={handleDeletePhoto}
+      onDeleteAudio={handleDeleteAudio}
+      onUpdateAudioSpeaker={handleUpdateAudioSpeaker}
       identity={identity}
       onIdentityReset={handleIdentityReset}
     />

@@ -1,17 +1,36 @@
 import { useState, useRef, useEffect } from 'react';
-import { Play, Pause, AudioLines } from 'lucide-react';
+import { Play, Pause, AudioLines, Trash2, Pencil } from 'lucide-react';
+import { FAMILY_MEMBERS } from '../types';
 
-interface AudioPlayerProps {
-  url: string;
-  voiceSpeaker?: string | null;
-  className?: string;
-}
+// Discriminated union: callbacks require id; no callbacks = id omitted
+type AudioPlayerProps =
+  | {
+      url: string;
+      voiceSpeaker?: string | null;
+      className?: string;
+      id: number;
+      onDelete?: (id: number) => Promise<void>;
+      onUpdateSpeaker?: (id: number, speaker: string | null) => Promise<void>;
+    }
+  | {
+      url: string;
+      voiceSpeaker?: string | null;
+      className?: string;
+      id?: never;
+      onDelete?: never;
+      onUpdateSpeaker?: never;
+    };
 
-export function AudioPlayer({ url, voiceSpeaker, className }: AudioPlayerProps) {
+// Destructure id as a number — TS guarantees it's present when callbacks are passed
+export function AudioPlayer({ url, voiceSpeaker, className, id, onDelete, onUpdateSpeaker }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [speakerEditMode, setSpeakerEditMode] = useState(false);
+  const [isSavingSpeaker, setIsSavingSpeaker] = useState(false);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -61,13 +80,55 @@ export function AudioPlayer({ url, voiceSpeaker, className }: AudioPlayerProps) 
     <div className={className}>
       <audio ref={audioRef} src={url} preload="metadata" />
 
-      {voiceSpeaker && (
-        <p className="text-xs mb-1.5 flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+      {/* Speaker row — shown if speaker is set or if edit is possible */}
+      {(voiceSpeaker || onUpdateSpeaker) && (
+        <div className="flex items-center gap-1.5 mb-1.5">
           <span>🎙️</span>
-          {voiceSpeaker}
-        </p>
+          {speakerEditMode ? (
+            <select
+              className="text-xs rounded px-1 py-0.5 border"
+              style={{ color: 'var(--color-text-muted)', borderColor: 'var(--color-sand-200)', backgroundColor: 'white' }}
+              defaultValue={voiceSpeaker ?? ''}
+              disabled={isSavingSpeaker}
+              autoFocus
+              onBlur={() => { if (!isSavingSpeaker) setSpeakerEditMode(false); }}
+              onChange={async (e) => {
+                if (!onUpdateSpeaker || id === undefined) return;
+                setIsSavingSpeaker(true);
+                try {
+                  await onUpdateSpeaker(id, e.target.value || null);
+                } finally {
+                  setIsSavingSpeaker(false);
+                  setSpeakerEditMode(false);
+                }
+              }}
+            >
+              <option value="">— kein Sprecher —</option>
+              {FAMILY_MEMBERS.map(m => (
+                <option key={m.name} value={m.name}>{m.name}</option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                {voiceSpeaker ?? '—'}
+              </span>
+              {onUpdateSpeaker && id !== undefined && (
+                <button
+                  type="button"
+                  onClick={() => setSpeakerEditMode(true)}
+                  className="p-0.5 rounded hover:bg-black/5 transition-colors"
+                  title="Sprecher bearbeiten"
+                >
+                  <Pencil className="w-3 h-3" style={{ color: 'var(--color-text-muted)' }} />
+                </button>
+              )}
+            </>
+          )}
+        </div>
       )}
 
+      {/* Player row */}
       <div
         className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
         style={{ backgroundColor: 'var(--color-sand-50)', border: '1px solid var(--color-sand-200)' }}
@@ -89,7 +150,55 @@ export function AudioPlayer({ url, voiceSpeaker, className }: AudioPlayerProps) 
         <span className="text-xs font-mono" style={{ color: 'var(--color-text-muted)' }}>
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>
+
+        {/* Delete trigger button */}
+        {onDelete && id !== undefined && (
+          <button
+            type="button"
+            onClick={() => setDeleteConfirm(true)}
+            className="ml-auto p-1.5 rounded-lg transition-colors flex-shrink-0"
+            style={{ color: 'var(--color-text-muted)' }}
+            title="Aufnahme löschen"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
+
+      {/* Delete confirm row */}
+      {deleteConfirm && onDelete && id !== undefined && (
+        <div className="mt-1.5 flex items-center justify-between gap-2 px-1">
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Aufnahme löschen?</span>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              disabled={isDeleting}
+              className="text-xs px-2 py-1 rounded-lg"
+              style={{ backgroundColor: 'var(--color-sand-100)', color: 'var(--color-text-secondary)' }}
+              onClick={() => setDeleteConfirm(false)}
+            >
+              Abbrechen
+            </button>
+            <button
+              type="button"
+              disabled={isDeleting}
+              className="text-xs px-2 py-1 rounded-lg font-semibold"
+              style={{ backgroundColor: '#dc2626', color: 'white', opacity: isDeleting ? 0.6 : 1 }}
+              onClick={async () => {
+                setIsDeleting(true);
+                try {
+                  await onDelete(id);
+                } finally {
+                  setIsDeleting(false);
+                  setDeleteConfirm(false);
+                }
+              }}
+            >
+              {isDeleting ? 'Löschen...' : 'Löschen'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
