@@ -21,7 +21,7 @@ function transformMemoryUrls(memory: RawMemory): Memory {
   return {
     ...memory,
     people: memory.people || [],
-    photos: memory.photos.map(p => ({ ...p, url: toAbsolute(p.url) })),
+    photos: (memory.photos || []).map(p => ({ ...p, url: toAbsolute(p.url) })),
     audios: (memory.audios || []).map(a => ({ ...a, url: toAbsolute(a.url) })),
     videos: (memory.videos || []).map(v => ({ ...v, url: toAbsolute(v.url) })),
   };
@@ -346,4 +346,39 @@ export async function attachAudio(
   }
 
   return transformMemoryUrls(json.data);
+}
+
+export async function fetchSharedMemory(token: string): Promise<Memory> {
+  const response = await fetch(`${API_BASE_URL}/api/share/${token}`);
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
+  }
+
+  const json: ApiResponse<RawMemory> = await response.json();
+
+  if (!json.success) {
+    throw new Error(json.error || 'Fehler beim Laden der Erinnerung');
+  }
+
+  return transformMemoryUrls(json.data);
+}
+
+export async function createShareLink(memoryId: number): Promise<{ url: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/memories/${memoryId}/share`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
+  }
+
+  const json: ApiResponse<{ url: string }> = await response.json();
+
+  if (!json.success) {
+    throw new Error(json.error || 'Fehler beim Erstellen des Links');
+  }
+
+  return json.data;
 }

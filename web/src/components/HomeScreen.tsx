@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, X, Calendar, User, MessageCircle, Image as ImageIcon,
   Pencil, Check, Trash2, Search, MapPin, Star, Plus, Mic, Heart,
   Sparkles, SlidersHorizontal, Camera, Settings, HelpCircle,
-  Type, Contrast, Link2, Map, List, Clock, AudioLines
+  Type, Contrast, Link2, Map, List, Clock, AudioLines, Share2
 } from 'lucide-react';
 import type { Memory } from '../types';
 import { FAMILY_MEMBERS, LOCATIONS } from '../types';
@@ -35,6 +35,7 @@ interface HomeScreenProps {
   onDeletePhoto?: (memoryId: number, photoId: number) => Promise<void>;
   onDeleteAudio?: (memoryId: number, audioId: number) => Promise<void>;
   onUpdateAudioSpeaker?: (memoryId: number, audioId: number, speaker: string | null) => Promise<void>;
+  onShare?: (memoryId: number) => Promise<void>;
   identity?: string | null;
   onIdentityReset?: () => void;
 }
@@ -79,7 +80,7 @@ const FONT_SIZE_CLASSES: Record<FontSize, string> = {
   xlarge: 'font-xlarge',
 };
 
-export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, onDelete, onToggleFavorite, onCreate, onDeletePhoto, onDeleteAudio, onUpdateAudioSpeaker, identity, onIdentityReset }: HomeScreenProps) {
+export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, onDelete, onToggleFavorite, onCreate, onDeletePhoto, onDeleteAudio, onUpdateAudioSpeaker, onShare, identity, onIdentityReset }: HomeScreenProps) {
   const [personFilter, setPersonFilter] = useState<string>('Alle');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('7d');
   const [locationFilter, setLocationFilter] = useState<string>('Alle');
@@ -97,6 +98,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
   const [lightboxEditText, setLightboxEditText] = useState('');
   const [lightboxIsSaving, setLightboxIsSaving] = useState(false);
   const [visibleImages, setVisibleImages] = useState(24);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
   const [visibleEntries, setVisibleEntries] = useState(20);
   const textScrollRef = useRef<HTMLDivElement>(null);
   const textSentinelRef = useRef<HTMLDivElement>(null);
@@ -1097,8 +1099,25 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                           )}
 
                           {/* Action Buttons */}
-                          {(onUpdate || onDelete) && !isEditing && !isDeleteConfirm && (
+                          {(onUpdate || onDelete || onShare) && !isEditing && !isDeleteConfirm && (
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                              {onShare && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    await onShare(memory.id);
+                                    setCopiedId(memory.id);
+                                    setTimeout(() => setCopiedId(prev => prev === memory.id ? null : prev), 2000);
+                                  }}
+                                  className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg transition-all hover:bg-white/80 hover:scale-110"
+                                  title="Link teilen"
+                                >
+                                  {copiedId === memory.id
+                                    ? <Check className="w-3.5 h-3.5" style={{ color: 'var(--color-sage-500)' }} />
+                                    : <Share2 className="w-3.5 h-3.5" style={{ color: 'var(--color-text-muted)' }} />
+                                  }
+                                </button>
+                              )}
                               {onUpdate && (
                                 <button
                                   onClick={() => handleStartEdit(memory)}

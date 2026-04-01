@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { HomeScreen, LoginScreen, IdentityPicker } from './components';
-import { fetchMemories, updateMemory, updateMemoryDate, updateMemoryPerson, deleteMemory, toggleFavorite, createMemory, uploadPhotos, deletePhoto, deleteAudio, updateAudioSpeaker } from './api/memoriesApi';
+import { HomeScreen, LoginScreen, IdentityPicker, SharedMemoryView } from './components';
+import { fetchMemories, updateMemory, updateMemoryDate, updateMemoryPerson, deleteMemory, toggleFavorite, createMemory, uploadPhotos, deletePhoto, deleteAudio, updateAudioSpeaker, createShareLink } from './api/memoriesApi';
 import type { Memory } from './types';
 import { Loader2, Heart, RefreshCw, AlertTriangle } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 function App() {
+  const [shareToken] = useState(() => new URLSearchParams(window.location.search).get('share'));
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +110,21 @@ function App() {
     setMemories(prev => prev.map(m => m.id === memoryId ? updated : m));
   }
 
+  async function handleShare(memoryId: number) {
+    try {
+      const { url } = await createShareLink(memoryId);
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        // Clipboard unavailable (e.g. Telegram WebView) — show URL for manual copy
+        window.prompt('Link kopieren:', url);
+      }
+    } catch (err) {
+      console.error('Share failed:', err);
+      alert('Link konnte nicht erstellt werden.');
+    }
+  }
+
   async function handleCreate(data: {
     text: string;
     child_name?: string;
@@ -128,6 +144,11 @@ function App() {
 
     setMemories(prev => [created, ...prev]);
     return created;
+  }
+
+  // Public share view — show without auth
+  if (shareToken) {
+    return <SharedMemoryView token={shareToken} />;
   }
 
   // Checking authentication - Premium loading state
@@ -326,6 +347,7 @@ function App() {
       onDeletePhoto={handleDeletePhoto}
       onDeleteAudio={handleDeleteAudio}
       onUpdateAudioSpeaker={handleUpdateAudioSpeaker}
+      onShare={handleShare}
       identity={identity}
       onIdentityReset={handleIdentityReset}
     />

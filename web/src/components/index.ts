@@ -6,3 +6,4 @@ export { LocationAutocomplete } from './LocationAutocomplete';
 export { IdentityPicker } from './IdentityPicker';
 export { HorizontalTimeline } from './HorizontalTimeline';
 export { AudioPlayer } from './AudioPlayer';
+export { SharedMemoryView } from './SharedMemoryView';
