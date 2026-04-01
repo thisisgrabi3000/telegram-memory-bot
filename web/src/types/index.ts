@@ -72,6 +72,7 @@ export interface Photo {
   id: number;
   url: string;
   filename: string;
+  people: string[];
 }
 
 export interface Audio {

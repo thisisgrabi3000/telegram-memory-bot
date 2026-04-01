@@ -33,6 +33,7 @@ interface HomeScreenProps {
     longitude?: number;
   }) => Promise<Memory>;
   onDeletePhoto?: (memoryId: number, photoId: number) => Promise<void>;
+  onUpdatePhotoPeople?: (memoryId: number, photoId: number, people: string[]) => Promise<void>;
   onDeleteAudio?: (memoryId: number, audioId: number) => Promise<void>;
   onUpdateAudioSpeaker?: (memoryId: number, audioId: number, speaker: string | null) => Promise<void>;
   onShare?: (memoryId: number) => Promise<void>;
@@ -80,7 +81,7 @@ const FONT_SIZE_CLASSES: Record<FontSize, string> = {
   xlarge: 'font-xlarge',
 };
 
-export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, onDelete, onToggleFavorite, onCreate, onDeletePhoto, onDeleteAudio, onUpdateAudioSpeaker, onShare, identity, onIdentityReset }: HomeScreenProps) {
+export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, onDelete, onToggleFavorite, onCreate, onDeletePhoto, onUpdatePhotoPeople, onDeleteAudio, onUpdateAudioSpeaker, onShare, identity, onIdentityReset }: HomeScreenProps) {
   const [personFilter, setPersonFilter] = useState<string>('Alle');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('7d');
   const [locationFilter, setLocationFilter] = useState<string>('Alle');
@@ -97,6 +98,8 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
   const [lightboxEditMode, setLightboxEditMode] = useState(false);
   const [lightboxEditText, setLightboxEditText] = useState('');
   const [lightboxIsSaving, setLightboxIsSaving] = useState(false);
+  const [lightboxPhotoPeopleEditMode, setLightboxPhotoPeopleEditMode] = useState(false);
+  const [lightboxIsSavingPeople, setLightboxIsSavingPeople] = useState(false);
   const [visibleImages, setVisibleImages] = useState(24);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [visibleEntries, setVisibleEntries] = useState(20);
@@ -168,6 +171,7 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
     if (!lightboxImage) {
       setLightboxEditMode(false);
       setLightboxEditText('');
+      setLightboxPhotoPeopleEditMode(false);
     }
   }, [lightboxImage]);
 
@@ -1542,6 +1546,89 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
                 )}
               </div>
             </div>
+            {/* People tags for this photo */}
+            {(currentPhoto.people.length > 0 || onUpdatePhotoPeople) && (
+              <div style={{ marginTop: '0.5rem' }} onClick={e => e.stopPropagation()}>
+                {lightboxPhotoPeopleEditMode ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
+                    {FAMILY_MEMBERS.map(member => {
+                      const isTagged = currentPhoto.people.includes(member.name);
+                      return (
+                        <button
+                          key={member.name}
+                          disabled={lightboxIsSavingPeople}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!onUpdatePhotoPeople) return;
+                            const newPeople = isTagged
+                              ? currentPhoto.people.filter(p => p !== member.name)
+                              : [...currentPhoto.people, member.name];
+                            setLightboxIsSavingPeople(true);
+                            try {
+                              await onUpdatePhotoPeople(lightboxImage.memory.id, currentPhoto.id, newPeople);
+                            } finally {
+                              setLightboxIsSavingPeople(false);
+                            }
+                          }}
+                          style={{
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '999px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            border: `1.5px solid ${isTagged ? member.color.activeBg : 'rgba(255,255,255,0.3)'}`,
+                            backgroundColor: isTagged ? member.color.activeBg : 'rgba(255,255,255,0.1)',
+                            color: isTagged ? 'white' : 'rgba(255,255,255,0.7)',
+                            cursor: lightboxIsSavingPeople ? 'not-allowed' : 'pointer',
+                            opacity: lightboxIsSavingPeople ? 0.6 : 1,
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          {isTagged && <Check className="w-2.5 h-2.5 inline mr-1" />}
+                          {member.name}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setLightboxPhotoPeopleEditMode(false); }}
+                      style={{ padding: '0.2rem 0.5rem', borderRadius: '999px', fontSize: '0.75rem', border: 'none', backgroundColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
+                    {currentPhoto.people.map(person => {
+                      const member = FAMILY_MEMBERS.find(m => m.name === person);
+                      return (
+                        <span
+                          key={person}
+                          style={{
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '999px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            backgroundColor: member ? member.color.activeBg : 'rgba(255,255,255,0.2)',
+                            color: 'white',
+                          }}
+                        >
+                          {person}
+                        </span>
+                      );
+                    })}
+                    {onUpdatePhotoPeople && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setLightboxPhotoPeopleEditMode(true); }}
+                        style={{ padding: '0.2rem 0.4rem', borderRadius: '999px', border: 'none', backgroundColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem' }}
+                        title="Personen bearbeiten"
+                      >
+                        <Pencil className="w-2.5 h-2.5" />
+                        {currentPhoto.people.length === 0 && <span>Personen</span>}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             {/* Text display / edit */}
             <div style={{ marginTop: '0.75rem' }} onClick={e => e.stopPropagation()}>
               {lightboxEditMode ? (

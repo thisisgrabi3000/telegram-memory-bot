@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HomeScreen, LoginScreen, IdentityPicker, SharedMemoryView } from './components';
-import { fetchMemories, updateMemory, updateMemoryDate, updateMemoryPerson, deleteMemory, toggleFavorite, createMemory, uploadPhotos, deletePhoto, deleteAudio, updateAudioSpeaker, createShareLink } from './api/memoriesApi';
+import { fetchMemories, updateMemory, updateMemoryDate, updateMemoryPerson, deleteMemory, toggleFavorite, createMemory, uploadPhotos, deletePhoto, deleteAudio, updateAudioSpeaker, createShareLink, updatePhotoPeople } from './api/memoriesApi';
 import type { Memory } from './types';
 import { Loader2, Heart, RefreshCw, AlertTriangle } from 'lucide-react';
 
@@ -124,6 +124,11 @@ function App() {
 
   async function handleUpdateAudioSpeaker(memoryId: number, audioId: number, speaker: string | null) {
     const updated = await updateAudioSpeaker(memoryId, audioId, speaker);
+    setMemories(prev => prev.map(m => m.id === memoryId ? updated : m));
+  }
+
+  async function handleUpdatePhotoPeople(memoryId: number, photoId: number, people: string[]) {
+    const updated = await updatePhotoPeople(memoryId, photoId, people);
     setMemories(prev => prev.map(m => m.id === memoryId ? updated : m));
   }
 
@@ -364,6 +369,7 @@ function App() {
       onDeletePhoto={handleDeletePhoto}
       onDeleteAudio={handleDeleteAudio}
       onUpdateAudioSpeaker={handleUpdateAudioSpeaker}
+      onUpdatePhotoPeople={handleUpdatePhotoPeople}
       onShare={handleShare}
       identity={identity}
       onIdentityReset={handleIdentityReset}

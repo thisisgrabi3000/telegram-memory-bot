@@ -10,7 +10,7 @@ interface ApiResponse<T> {
 }
 
 interface RawMemory extends Omit<Memory, 'photos' | 'audios' | 'videos'> {
-  photos: Array<{ id: number; url: string; filename: string }>;
+  photos: Array<{ id: number; url: string; filename: string; people: string[] }>;
   audios: Array<{ id: number; url: string; filename: string; voice_speaker: string | null }>;
   videos: Array<{ id: number; url: string; filename: string }>;
 }
@@ -21,7 +21,7 @@ function transformMemoryUrls(memory: RawMemory): Memory {
   return {
     ...memory,
     people: memory.people || [],
-    photos: (memory.photos || []).map(p => ({ ...p, url: toAbsolute(p.url) })),
+    photos: (memory.photos || []).map(p => ({ ...p, url: toAbsolute(p.url), people: p.people || [] })),
     audios: (memory.audios || []).map(a => ({ ...a, url: toAbsolute(a.url) })),
     videos: (memory.videos || []).map(v => ({ ...v, url: toAbsolute(v.url) })),
   };
@@ -381,4 +381,25 @@ export async function createShareLink(memoryId: number): Promise<{ url: string }
   }
 
   return json.data;
+}
+
+export async function updatePhotoPeople(memoryId: number, photoId: number, people: string[]): Promise<Memory> {
+  const response = await fetch(`${API_BASE_URL}/api/memories/${memoryId}/photos/${photoId}/people`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ people }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
+  }
+
+  const json: ApiResponse<RawMemory> = await response.json();
+
+  if (!json.success) {
+    throw new Error(json.error || 'Fehler beim Aktualisieren');
+  }
+
+  return transformMemoryUrls(json.data);
 }
