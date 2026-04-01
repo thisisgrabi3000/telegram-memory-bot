@@ -19,6 +19,7 @@ export default defineConfig({
         orientation: 'portrait',
         lang: 'de',
         start_url: '/',
+        scope: '/',
         icons: [
           {
             src: 'icon-192.png',
@@ -37,6 +38,22 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
+        share_target: {
+          action: '/api/memories/share-target',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            title: 'title',
+            text: 'text',
+            url: 'url',
+            files: [
+              {
+                name: 'photos',
+                accept: ['image/*'],
+              },
+            ],
+          },
+        },
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],

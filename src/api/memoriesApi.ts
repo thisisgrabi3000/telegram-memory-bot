@@ -11,6 +11,7 @@ import {
   createMemorySchema,
   updateMemorySchema,
   updateDateSchema,
+  updateLocationSchema,
   updatePersonSchema,
   memoriesQuerySchema,
   idParamSchema,
@@ -26,6 +27,12 @@ import {
 import { requireAuth } from './authApi';
 import { compressImage } from '../services/imageCompressionService';
 
+const MAX_CAPTURE_TEXT_LENGTH = 10000;
+const MAX_CAPTURE_NAME_LENGTH = 100;
+const MAX_CAPTURE_LOCATION_LENGTH = 200;
+const MAX_PHOTOS_PER_MEMORY = 30;
+const AUDIO_FILENAME_PATTERN = /^voice_\d+_[a-z0-9]+\.[a-z0-9]+$/i;
+
 /**
  * Sicheres JSON-Parsing mit Fallback.
  */
@@ -36,6 +43,109 @@ function safeJsonParse<T>(json: string | null, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function parseOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function parseOptionalNumber(value: unknown): number | undefined {
+  if (typeof value !== 'string' || value.trim() === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseOptionalPeople(value: unknown): string[] | undefined {
+  if (typeof value !== 'string' || value.trim() === '') return undefined;
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return undefined;
+    const people = parsed
+      .filter((item): item is string => typeof item === 'string')
+      .map(person => person.trim())
+      .filter(Boolean)
+      .slice(0, 20);
+    return people.length > 0 ? people : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function createWebMemoryEntry({
+  text,
+  child_name,
+  location,
+  source_date,
+  explicitPeople,
+  latitude,
+  longitude,
+  recorded_by,
+}: {
+  text: string;
+  child_name?: string | null;
+  location?: string | null;
+  source_date?: string;
+  explicitPeople?: string[];
+  latitude?: number | null;
+  longitude?: number | null;
+  recorded_by?: string;
+}): Promise<MemoryEntry> {
+  const date = source_date || new Date().toISOString().split('T')[0];
+
+  const entry = memoryRepository.create({
+    source_date: date,
+    source_type: 'web',
+    source_message_id: 0,
+    telegram_chat_id: 0,
+    raw_transcript: text.trim(),
+    transcript_status: 'completed',
+    processing_status: 'pending',
+    recorded_by: recorded_by || 'Web App',
+  });
+
+  if (text.trim()) {
+    try {
+      const summary = await summarizationService.summarize(text.trim());
+      const mergedPeople = [...new Set([...(summary.people || []), ...(explicitPeople || [])])];
+
+      memoryRepository.updateSummary(entry.id, {
+        ...summary,
+        child_name: child_name !== undefined ? (child_name || null) : summary.child_name,
+        people: mergedPeople,
+      });
+    } catch (summaryError) {
+      console.error('Zusammenfassung fehlgeschlagen:', summaryError);
+      memoryRepository.updateSummary(entry.id, {
+        child_name: child_name || null,
+        cleaned_summary: text.trim(),
+        categories: [],
+        tags: [],
+        people: explicitPeople || [],
+        importance_score: 3,
+      });
+    }
+  } else {
+    memoryRepository.updateSummary(entry.id, {
+      child_name: child_name || null,
+      cleaned_summary: '',
+      categories: [],
+      tags: [],
+      people: explicitPeople || [],
+      importance_score: 3,
+    });
+  }
+
+  if (location) {
+    memoryRepository.updateLocation(entry.id, location);
+  }
+
+  if (latitude != null && longitude != null) {
+    memoryRepository.updateCoordinates(entry.id, latitude, longitude);
+  }
+
+  return memoryRepository.findById(entry.id)!;
 }
 
 const router = Router();
@@ -51,7 +161,7 @@ const upload = multer({
       cb(null, `web_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
     },
   }),
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB (compressed server-side)
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB per file (compressed server-side)
   fileFilter: (_req, file, cb) => {
     cb(null, file.mimetype.startsWith('image/'));
   },
@@ -286,6 +396,36 @@ router.patch('/memories/:id/date', writeLimiter, validateParams(idParamSchema), 
 });
 
 /**
+ * PATCH /api/memories/:id/location
+ * Aktualisiert den Ort einer Erinnerung
+ */
+router.patch('/memories/:id/location', writeLimiter, validateParams(idParamSchema), validateBody(updateLocationSchema), (req, res) => {
+  try {
+    const { id } = req.params as unknown as { id: number };
+    const { location } = req.body as { location: string | null };
+
+    const memory = memoryRepository.findById(id);
+    if (!memory) {
+      return res.status(404).json({ success: false, error: 'Erinnerung nicht gefunden' });
+    }
+
+    memoryRepository.updateLocation(id, location ?? null);
+
+    const updatedMemory = memoryRepository.findById(id);
+    const attachments = mediaRepository.findByMemoryId(id);
+
+    res.json({
+      success: true,
+      message: 'Ort aktualisiert',
+      data: transformMemory(updatedMemory!, attachments),
+    });
+  } catch (error) {
+    console.error('API Error:', error);
+    res.status(500).json({ success: false, error: 'Fehler beim Aktualisieren des Orts' });
+  }
+});
+
+/**
  * PATCH /api/memories/:id/person
  * Aktualisiert die erkannte Person (child_name) einer Erinnerung
  */
@@ -332,70 +472,22 @@ router.post('/memories', aiLimiter, validateBody(createMemorySchema), async (req
       recorded_by?: string;
     };
 
-    const date = source_date || new Date().toISOString().split('T')[0];
-
-    const entry = memoryRepository.create({
-      source_date: date,
-      source_type: 'web',
-      source_message_id: 0,
-      telegram_chat_id: 0,
-      raw_transcript: text.trim(),
-      transcript_status: 'completed',
-      processing_status: 'pending',
-      recorded_by: recorded_by || 'Web App',
+    const updatedMemory = await createWebMemoryEntry({
+      text,
+      child_name,
+      location,
+      source_date,
+      explicitPeople,
+      latitude,
+      longitude,
+      recorded_by,
     });
-
-    if (text.trim()) {
-      try {
-        const summary = await summarizationService.summarize(text.trim());
-
-        // Merge AI-erkannte mit explizit gewählten Personen
-        const mergedPeople = [...new Set([...(summary.people || []), ...(explicitPeople || [])])];
-
-        memoryRepository.updateSummary(entry.id, {
-          ...summary,
-          // Explizit gewählter child_name hat Vorrang, sonst AI-Ergebnis
-          child_name: child_name !== undefined ? (child_name || null) : summary.child_name,
-          people: mergedPeople,
-        });
-      } catch (summaryError) {
-        console.error('Zusammenfassung fehlgeschlagen:', summaryError);
-        memoryRepository.updateSummary(entry.id, {
-          child_name: child_name || null,
-          cleaned_summary: text.trim(),
-          categories: [],
-          tags: [],
-          people: explicitPeople || [],
-          importance_score: 3,
-        });
-      }
-    } else {
-      // Kein Text: direkt ohne KI-Zusammenfassung speichern
-      memoryRepository.updateSummary(entry.id, {
-        child_name: child_name || null,
-        cleaned_summary: '',
-        categories: [],
-        tags: [],
-        people: explicitPeople || [],
-        importance_score: 3,
-      });
-    }
-
-    if (location) {
-      memoryRepository.updateLocation(entry.id, location);
-    }
-
-    if (latitude != null && longitude != null) {
-      memoryRepository.updateCoordinates(entry.id, latitude, longitude);
-    }
-
-    const updatedMemory = memoryRepository.findById(entry.id);
-    const attachments = mediaRepository.findByMemoryId(entry.id);
+    const attachments = mediaRepository.findByMemoryId(updatedMemory.id);
 
     res.status(201).json({
       success: true,
       message: 'Erinnerung erstellt',
-      data: transformMemory(updatedMemory!, attachments),
+      data: transformMemory(updatedMemory, attachments),
     });
   } catch (error) {
     console.error('API Error:', error);
@@ -403,6 +495,196 @@ router.post('/memories', aiLimiter, validateBody(createMemorySchema), async (req
       success: false,
       error: 'Fehler beim Erstellen der Erinnerung',
     });
+  }
+});
+
+router.post('/memories/capture', writeLimiter, upload.fields([{ name: 'photos', maxCount: MAX_PHOTOS_PER_MEMORY }]), async (req, res) => {
+  const uploadedFilePaths = new Set<string>();
+  let createdMemoryId: number | null = null;
+
+  try {
+    const files = ((req.files as Record<string, Express.Multer.File[] | undefined>)?.photos || []) as Express.Multer.File[];
+    const text = typeof req.body.text === 'string' ? req.body.text : '';
+    const child_name = parseOptionalString(req.body.child_name) ?? null;
+    const location = parseOptionalString(req.body.location) ?? null;
+    const source_date = parseOptionalString(req.body.source_date);
+    const explicitPeople = parseOptionalPeople(req.body.people);
+    const latitude = parseOptionalNumber(req.body.latitude);
+    const longitude = parseOptionalNumber(req.body.longitude);
+    const recorded_by = parseOptionalString(req.body.recorded_by);
+    const audioFilename = parseOptionalString(req.body.audio_filename);
+    const voiceSpeaker = parseOptionalString(req.body.voice_speaker) ?? null;
+
+    if (text.length > MAX_CAPTURE_TEXT_LENGTH) {
+      return res.status(400).json({ success: false, error: `Text darf maximal ${MAX_CAPTURE_TEXT_LENGTH} Zeichen haben` });
+    }
+    if (child_name && child_name.length > MAX_CAPTURE_NAME_LENGTH) {
+      return res.status(400).json({ success: false, error: 'Name ist zu lang' });
+    }
+    if (location && location.length > MAX_CAPTURE_LOCATION_LENGTH) {
+      return res.status(400).json({ success: false, error: 'Ort ist zu lang' });
+    }
+    if (voiceSpeaker && voiceSpeaker.length > MAX_CAPTURE_NAME_LENGTH) {
+      return res.status(400).json({ success: false, error: 'Sprecher ist zu lang' });
+    }
+    if (source_date && !/^\d{4}-\d{2}-\d{2}$/.test(source_date)) {
+      return res.status(400).json({ success: false, error: 'Ungültiges Datumsformat (YYYY-MM-DD)' });
+    }
+    if ((latitude != null && (latitude < -90 || latitude > 90)) || (longitude != null && (longitude < -180 || longitude > 180))) {
+      return res.status(400).json({ success: false, error: 'Ungültige Koordinaten' });
+    }
+    if (!text.trim() && files.length === 0 && !audioFilename) {
+      return res.status(400).json({ success: false, error: 'Mindestens Text, Foto oder Audio ist erforderlich' });
+    }
+
+    const uploadsDir = path.resolve('./uploads');
+    for (const file of files) {
+      uploadedFilePaths.add(path.join(uploadsDir, file.filename));
+    }
+
+    if (audioFilename && !AUDIO_FILENAME_PATTERN.test(audioFilename)) {
+      return res.status(400).json({ success: false, error: 'Ungültiger Audio-Dateiname' });
+    }
+    if (audioFilename) {
+      const audioPath = path.resolve(uploadsDir, audioFilename);
+      if (!audioPath.startsWith(uploadsDir + path.sep) || !fs.existsSync(audioPath)) {
+        return res.status(400).json({ success: false, error: 'Audiodatei nicht gefunden' });
+      }
+    }
+
+    const createdMemory = await createWebMemoryEntry({
+      text,
+      child_name,
+      location,
+      source_date,
+      explicitPeople,
+      latitude,
+      longitude,
+      recorded_by,
+    });
+    createdMemoryId = createdMemory.id;
+
+    for (const file of files) {
+      const originalPath = path.join(uploadsDir, file.filename);
+      const compressedFilename = await compressImage(originalPath);
+      const finalPath = path.join(uploadsDir, compressedFilename);
+      uploadedFilePaths.add(finalPath);
+
+      mediaRepository.create({
+        memory_entry_id: createdMemory.id,
+        media_type: 'photo',
+        telegram_file_id: `web_${compressedFilename}`,
+        local_path: compressedFilename,
+      });
+    }
+
+    if (audioFilename) {
+      mediaRepository.create({
+        memory_entry_id: createdMemory.id,
+        media_type: 'audio',
+        telegram_file_id: `web_${audioFilename}`,
+        local_path: audioFilename,
+        voice_speaker: voiceSpeaker,
+      });
+    }
+
+    const updatedMemory = memoryRepository.findById(createdMemory.id);
+    const attachments = mediaRepository.findByMemoryId(createdMemory.id);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Erinnerung erfasst',
+      data: transformMemory(updatedMemory!, attachments),
+    });
+  } catch (error) {
+    console.error('Capture Error:', error);
+
+    if (createdMemoryId != null) {
+      mediaRepository.deleteByMemoryId(createdMemoryId);
+      memoryRepository.deleteById(createdMemoryId);
+    }
+
+    for (const filePath of uploadedFilePaths) {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch {
+        // best effort cleanup
+      }
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: 'Fehler beim Erfassen der Erinnerung',
+    });
+  }
+});
+
+router.post('/memories/share-target', writeLimiter, upload.fields([{ name: 'photos', maxCount: MAX_PHOTOS_PER_MEMORY }]), async (req, res) => {
+  const uploadedFilePaths = new Set<string>();
+  let createdMemoryId: number | null = null;
+
+  try {
+    const files = ((req.files as Record<string, Express.Multer.File[] | undefined>)?.photos || []) as Express.Multer.File[];
+    if (files.length === 0) {
+      return res.redirect(303, '/?share_import=error');
+    }
+
+    const sharedTitle = parseOptionalString(req.body.title);
+    const sharedText = parseOptionalString(req.body.text);
+    const sharedUrl = parseOptionalString(req.body.url);
+    const sharedNote = [sharedTitle, sharedText, sharedUrl].filter(Boolean).join('\n\n');
+
+    const uploadsDir = path.resolve('./uploads');
+    for (const file of files) {
+      uploadedFilePaths.add(path.join(uploadsDir, file.filename));
+    }
+
+    const createdMemory = await createWebMemoryEntry({
+      text: sharedNote,
+      recorded_by: req.session.identity || 'Web App',
+    });
+    createdMemoryId = createdMemory.id;
+
+    for (const file of files) {
+      const originalPath = path.join(uploadsDir, file.filename);
+      const compressedFilename = await compressImage(originalPath);
+      const finalPath = path.join(uploadsDir, compressedFilename);
+      uploadedFilePaths.add(finalPath);
+
+      mediaRepository.create({
+        memory_entry_id: createdMemory.id,
+        media_type: 'photo',
+        telegram_file_id: `web_${compressedFilename}`,
+        local_path: compressedFilename,
+      });
+    }
+
+    req.session.shareTargetFlash = files.length === 1
+      ? '1 Foto wurde direkt in Famories gespeichert.'
+      : `${files.length} Fotos wurden direkt in Famories gespeichert.`;
+
+    return res.redirect(303, '/?share_import=success');
+  } catch (error) {
+    console.error('Share target capture error:', error);
+
+    if (createdMemoryId != null) {
+      mediaRepository.deleteByMemoryId(createdMemoryId);
+      memoryRepository.deleteById(createdMemoryId);
+    }
+
+    for (const filePath of uploadedFilePaths) {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch {
+        // best effort cleanup
+      }
+    }
+
+    return res.redirect(303, '/?share_import=error');
   }
 });
 
@@ -493,7 +775,7 @@ router.post('/memories/:id/favorite', writeLimiter, validateParams(idParamSchema
  * POST /api/memories/:id/photos
  * Lädt Fotos zu einer bestehenden Erinnerung hoch
  */
-router.post('/memories/:id/photos', writeLimiter, validateParams(idParamSchema), upload.array('photos', 10), async (req, res) => {
+router.post('/memories/:id/photos', writeLimiter, validateParams(idParamSchema), upload.array('photos', MAX_PHOTOS_PER_MEMORY), async (req, res) => {
   try {
     const { id } = req.params as unknown as { id: number };
 
@@ -760,6 +1042,15 @@ router.get('/locations', (_req, res) => {
       error: 'Fehler beim Laden der Orte',
     });
   }
+});
+
+router.get('/share-target-status', (req, res) => {
+  const message = req.session.shareTargetFlash ?? null;
+  req.session.shareTargetFlash = null;
+  res.json({
+    success: true,
+    data: { message },
+  });
 });
 
 /**

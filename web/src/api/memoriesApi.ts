@@ -1,4 +1,4 @@
-import type { Memory } from '../types';
+import type { Memory, CreateMemoryPayload } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
@@ -61,6 +61,24 @@ export async function fetchChildren(): Promise<string[]> {
   }
 
   return json.data;
+}
+
+export async function fetchShareTargetStatus(): Promise<string | null> {
+  const response = await fetch(`${API_BASE_URL}/api/share-target-status`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
+  }
+
+  const json: ApiResponse<{ message: string | null }> = await response.json();
+
+  if (!json.success) {
+    throw new Error(json.error || 'Unbekannter Fehler');
+  }
+
+  return json.data.message;
 }
 
 export async function deleteMemory(id: number): Promise<void> {
@@ -179,6 +197,43 @@ export async function uploadPhotos(id: number, files: File[]): Promise<Memory> {
   return transformMemoryUrls(json.data);
 }
 
+export async function captureMemory(input: CreateMemoryPayload & { recorded_by?: string }): Promise<Memory> {
+  const formData = new FormData();
+  formData.append('text', input.text);
+
+  if (input.child_name) formData.append('child_name', input.child_name);
+  if (input.location) formData.append('location', input.location);
+  if (input.source_date) formData.append('source_date', input.source_date);
+  if (input.people && input.people.length > 0) formData.append('people', JSON.stringify(input.people));
+  if (input.latitude != null) formData.append('latitude', String(input.latitude));
+  if (input.longitude != null) formData.append('longitude', String(input.longitude));
+  if (input.recorded_by) formData.append('recorded_by', input.recorded_by);
+  if (input.audioFilename) formData.append('audio_filename', input.audioFilename);
+  if (input.voiceSpeaker) formData.append('voice_speaker', input.voiceSpeaker);
+
+  for (const file of input.photos || []) {
+    formData.append('photos', file);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/memories/capture`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
+  }
+
+  const json: ApiResponse<RawMemory> = await response.json();
+
+  if (!json.success) {
+    throw new Error(json.error || 'Fehler beim Erfassen der Erinnerung');
+  }
+
+  return transformMemoryUrls(json.data);
+}
+
 export async function deletePhoto(memoryId: number, photoId: number): Promise<Memory> {
   const response = await fetch(`${API_BASE_URL}/api/memories/${memoryId}/photos/${photoId}`, {
     method: 'DELETE',
@@ -261,6 +316,27 @@ export async function updateMemoryDate(id: number, date: string): Promise<Memory
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify({ source_date: date }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
+  }
+
+  const json: ApiResponse<RawMemory> = await response.json();
+
+  if (!json.success) {
+    throw new Error(json.error || 'Fehler beim Aktualisieren');
+  }
+
+  return transformMemoryUrls(json.data);
+}
+
+export async function updateMemoryLocation(id: number, location: string | null): Promise<Memory> {
+  const response = await fetch(`${API_BASE_URL}/api/memories/${id}/location`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ location }),
   });
 
   if (!response.ok) {

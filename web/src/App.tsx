@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { HomeScreen, LoginScreen, IdentityPicker, SharedMemoryView } from './components';
-import { fetchMemories, updateMemory, updateMemoryDate, updateMemoryPerson, deleteMemory, toggleFavorite, createMemory, uploadPhotos, deletePhoto, deleteAudio, updateAudioSpeaker, createShareLink, updatePhotoPeople } from './api/memoriesApi';
-import type { Memory } from './types';
+import { fetchMemories, fetchShareTargetStatus, updateMemory, updateMemoryDate, updateMemoryLocation, updateMemoryPerson, deleteMemory, toggleFavorite, createMemory, captureMemory, deletePhoto, deleteAudio, updateAudioSpeaker, createShareLink, updatePhotoPeople } from './api/memoriesApi';
+import type { Memory, CreateMemoryPayload } from './types';
 import { Loader2, Heart, RefreshCw, AlertTriangle } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -16,6 +16,7 @@ function App() {
   const [identity, setIdentity] = useState<string | null>(() =>
     localStorage.getItem('famories_identity')
   );
+  const [shareImportMessage, setShareImportMessage] = useState<string | null>(null);
 
   // Check authentication on mount
   useEffect(() => {
@@ -26,6 +27,7 @@ function App() {
   useEffect(() => {
     if (isAuthenticated) {
       loadMemories();
+      loadShareTargetStatus();
     }
   }, [isAuthenticated]);
 
@@ -87,6 +89,18 @@ function App() {
     }
   }
 
+  async function loadShareTargetStatus() {
+    try {
+      const message = await fetchShareTargetStatus();
+      if (message) {
+        setShareImportMessage(message);
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch (err) {
+      console.error('Fehler beim Laden des Share-Status:', err);
+    }
+  }
+
   async function handleUpdate(id: number, text: string) {
     const updated = await updateMemory(id, text);
     setMemories(prev => prev.map(m => m.id === id ? updated : m));
@@ -94,6 +108,11 @@ function App() {
 
   async function handleUpdateDate(id: number, date: string) {
     const updated = await updateMemoryDate(id, date);
+    setMemories(prev => prev.map(m => m.id === id ? updated : m));
+  }
+
+  async function handleUpdateLocation(id: number, location: string | null) {
+    const updated = await updateMemoryLocation(id, location);
     setMemories(prev => prev.map(m => m.id === id ? updated : m));
   }
 
@@ -147,23 +166,11 @@ function App() {
     }
   }
 
-  async function handleCreate(data: {
-    text: string;
-    child_name?: string;
-    location?: string;
-    source_date?: string;
-    people?: string[];
-    photos?: File[];
-    latitude?: number;
-    longitude?: number;
-  }): Promise<Memory> {
-    const { photos, ...memoryData } = data;
-    let created = await createMemory({ ...memoryData, recorded_by: identity || undefined });
-
-    if (photos && photos.length > 0) {
-      created = await uploadPhotos(created.id, photos);
-    }
-
+  async function handleCreate(data: CreateMemoryPayload): Promise<Memory> {
+    const hasMedia = (data.photos && data.photos.length > 0) || data.audioFilename;
+    const created = hasMedia
+      ? await captureMemory({ ...data, recorded_by: identity || undefined })
+      : await createMemory({ ...data, recorded_by: identity || undefined });
     setMemories(prev => [created, ...prev]);
     return created;
   }
@@ -360,8 +367,11 @@ function App() {
   return (
     <HomeScreen
       memories={memories}
+      shareImportMessage={shareImportMessage}
+      onClearShareImportMessage={() => setShareImportMessage(null)}
       onUpdate={handleUpdate}
       onUpdateDate={handleUpdateDate}
+      onUpdateLocation={handleUpdateLocation}
       onUpdatePerson={handleUpdatePerson}
       onDelete={handleDelete}
       onToggleFavorite={handleToggleFavorite}

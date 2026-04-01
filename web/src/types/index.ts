@@ -108,6 +108,19 @@ export interface Memory {
   longitude: number | null;
 }
 
+export interface CreateMemoryPayload {
+  text: string;
+  child_name?: string;
+  location?: string;
+  source_date?: string;
+  people?: string[];
+  photos?: File[];
+  latitude?: number;
+  longitude?: number;
+  audioFilename?: string;
+  voiceSpeaker?: string | null;
+}
+
 export const LOCATIONS = [
   {
     name: 'Zuhause',

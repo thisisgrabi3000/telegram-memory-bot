@@ -1,28 +1,21 @@
-import { useState, useRef } from 'react';
-import { X, User, MapPin, Calendar, Loader2, Sparkles, PenLine, Check, Camera, ImagePlus, Mic, Music } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, User, MapPin, Calendar, Loader2, Sparkles, PenLine, Check, Camera, ImagePlus, Mic, Music, ClipboardPaste } from 'lucide-react';
 import { VoiceRecorder } from './VoiceRecorder';
-import { transcribeAudio, attachAudio } from '../api/memoriesApi';
+import { transcribeAudio } from '../api/memoriesApi';
 import exifr from 'exifr';
 import { FAMILY_MEMBERS, LOCATIONS } from '../types';
-import type { Memory } from '../types';
+import type { Memory, CreateMemoryPayload } from '../types';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import type { LocationResult } from './LocationAutocomplete';
 
 const CHILDREN = ['Junis', 'Noah'];
 const SPEAKER_OPTIONS = [...FAMILY_MEMBERS.map(m => m.name), 'Mehrere'];
+const CREATE_DRAFT_STORAGE_KEY = 'famories_create_memory_draft_v1';
+const MAX_PHOTOS_PER_MEMORY = 30;
 
 interface CreateMemoryModalProps {
   onClose: () => void;
-  onCreate: (data: {
-    text: string;
-    child_name?: string;
-    location?: string;
-    source_date?: string;
-    people?: string[];
-    photos?: File[];
-    latitude?: number;
-    longitude?: number;
-  }) => Promise<Memory>;
+  onCreate: (data: CreateMemoryPayload) => Promise<Memory>;
 }
 
 export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps) {
@@ -45,8 +38,73 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [exifHint, setExifHint] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pasteZoneRef = useRef<HTMLDivElement>(null);
+  const photoObjectUrlsRef = useRef<string[]>([]);
+  const [isPasteTargetActive, setIsPasteTargetActive] = useState(false);
+  const [restoredDraft, setRestoredDraft] = useState(false);
 
   const location = customLocation.trim() || presetLocation;
+
+  useEffect(() => {
+    return () => {
+      photoObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      photoObjectUrlsRef.current = [];
+    };
+  }, []);
+
+  useEffect(() => {
+    const rawDraft = localStorage.getItem(CREATE_DRAFT_STORAGE_KEY);
+    if (!rawDraft) return;
+
+    try {
+      const draft = JSON.parse(rawDraft) as {
+        text?: string;
+        selectedPeople?: string[];
+        presetLocation?: string;
+        customLocation?: string;
+        date?: string;
+        voiceSpeaker?: string | null;
+      };
+
+      if (draft.text) setText(draft.text);
+      if (Array.isArray(draft.selectedPeople)) setSelectedPeople(draft.selectedPeople);
+      if (draft.presetLocation) setPresetLocation(draft.presetLocation);
+      if (draft.customLocation) setCustomLocation(draft.customLocation);
+      if (draft.date) setDate(draft.date);
+      if (draft.voiceSpeaker) setVoiceSpeaker(draft.voiceSpeaker);
+      setRestoredDraft(Boolean(
+        draft.text ||
+        draft.customLocation ||
+        draft.presetLocation ||
+        (draft.selectedPeople && draft.selectedPeople.length > 0)
+      ));
+    } catch {
+      localStorage.removeItem(CREATE_DRAFT_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    const shouldPersist =
+      text.trim().length > 0 ||
+      selectedPeople.length > 0 ||
+      presetLocation.length > 0 ||
+      customLocation.trim().length > 0 ||
+      date !== new Date().toISOString().split('T')[0];
+
+    if (!shouldPersist) {
+      localStorage.removeItem(CREATE_DRAFT_STORAGE_KEY);
+      return;
+    }
+
+    localStorage.setItem(CREATE_DRAFT_STORAGE_KEY, JSON.stringify({
+      text,
+      selectedPeople,
+      presetLocation,
+      customLocation,
+      date,
+      voiceSpeaker,
+    }));
+  }, [text, selectedPeople, presetLocation, customLocation, date, voiceSpeaker]);
 
   function togglePerson(name: string) {
     setSelectedPeople(prev =>
@@ -81,30 +139,41 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
     setLocationCoords(result);
   }
 
-  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+  async function processIncomingPhotos(files: File[], source: 'picker' | 'paste' | 'drop') {
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    if (imageFiles.length === 0) {
+      if (source !== 'picker') {
+        setError('Es wurde kein Bild zum Einfügen gefunden.');
+      }
+      return;
+    }
 
-    const newPhotos = [...photos, ...files].slice(0, 10);
+    const slotsLeft = Math.max(0, MAX_PHOTOS_PER_MEMORY - photos.length);
+    if (slotsLeft === 0) {
+      setError(`Maximal ${MAX_PHOTOS_PER_MEMORY} Fotos pro Erinnerung.`);
+      return;
+    }
+
+    const acceptedFiles = imageFiles.slice(0, slotsLeft);
+    if (acceptedFiles.length < imageFiles.length) {
+      setError(`Nur die ersten ${MAX_PHOTOS_PER_MEMORY} Fotos wurden übernommen.`);
+    } else {
+      setError(null);
+    }
+
+    const newPhotos = [...photos, ...acceptedFiles];
     setPhotos(newPhotos);
 
-    // Generate previews
-    const newPreviews = [...photoPreviews];
-    files.slice(0, 10 - photoPreviews.length).forEach(file => {
-      const url = URL.createObjectURL(file);
-      newPreviews.push(url);
-    });
-    setPhotoPreviews(newPreviews.slice(0, 10));
-
-    // Reset input so same file can be re-selected
-    e.target.value = '';
+    const newObjectUrls = acceptedFiles.map(file => URL.createObjectURL(file));
+    photoObjectUrlsRef.current.push(...newObjectUrls);
+    setPhotoPreviews(prev => [...prev, ...newObjectUrls]);
 
     // Extract EXIF data from new files
     const today = new Date().toISOString().split('T')[0];
     let oldestDate: string | null = null;
     let firstGps: { latitude: number; longitude: number } | null = null;
 
-    for (const file of files) {
+    for (const file of acceptedFiles) {
       try {
         const exif = await exifr.parse(file, ['DateTimeOriginal', 'GPSLatitude', 'GPSLongitude']);
         if (!exif) continue;
@@ -143,8 +212,51 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
     }
   }
 
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    await processIncomingPhotos(files, 'picker');
+  }
+
+  function extractImageFiles(dataTransfer: DataTransfer | null): File[] {
+    if (!dataTransfer) return [];
+
+    const filesFromItems = Array.from(dataTransfer.items || [])
+      .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+      .map(item => item.getAsFile())
+      .filter((file): file is File => Boolean(file))
+      .map((file, index) => {
+        if (file.name) return file;
+        return new File([file], `clipboard-image-${Date.now()}-${index}.png`, { type: file.type || 'image/png' });
+      });
+
+    if (filesFromItems.length > 0) {
+      return filesFromItems;
+    }
+
+    return Array.from(dataTransfer.files || []).filter(file => file.type.startsWith('image/'));
+  }
+
+  async function handlePaste(event: React.ClipboardEvent<HTMLElement>) {
+    const files = extractImageFiles(event.clipboardData);
+    if (files.length === 0) return;
+
+    event.preventDefault();
+    await processIncomingPhotos(files, 'paste');
+  }
+
+  async function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsPasteTargetActive(false);
+    const files = extractImageFiles(event.dataTransfer);
+    if (files.length === 0) return;
+    await processIncomingPhotos(files, 'drop');
+  }
+
   function removePhoto(index: number) {
-    URL.revokeObjectURL(photoPreviews[index]);
+    const removedUrl = photoPreviews[index];
+    URL.revokeObjectURL(removedUrl);
+    photoObjectUrlsRef.current = photoObjectUrlsRef.current.filter(url => url !== removedUrl);
     setPhotos(prev => prev.filter((_, i) => i !== index));
     setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
   }
@@ -199,8 +311,14 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
         }
       }
 
-      // 2. Create memory
-      const created = await onCreate({
+      if (!finalText.trim() && photos.length === 0 && !pendingAudioFilename && !voiceSavedFilename) {
+        setError('Füge mindestens Text, Fotos oder Audio hinzu.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Create memory atomically with media
+      await onCreate({
         text: finalText,
         child_name,
         location: location || undefined,
@@ -209,20 +327,13 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
         photos: photos.length > 0 ? photos : undefined,
         latitude: locationCoords?.latitude,
         longitude: locationCoords?.longitude,
+        audioFilename: pendingAudioFilename ?? voiceSavedFilename,
+        voiceSpeaker,
       });
 
-      // 3. Attach audio file if any (file upload takes precedence over voice recording)
-      const filenameToAttach = pendingAudioFilename ?? voiceSavedFilename;
-      if (filenameToAttach) {
-        try {
-          await attachAudio(created.id, filenameToAttach, voiceSpeaker);
-        } catch (err) {
-          // Memory was saved — non-blocking warning only
-          console.warn('Audio konnte nicht angehängt werden:', err);
-        }
-      }
-
-      photoPreviews.forEach(url => URL.revokeObjectURL(url));
+      photoObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      photoObjectUrlsRef.current = [];
+      localStorage.removeItem(CREATE_DRAFT_STORAGE_KEY);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Speichern');
@@ -292,10 +403,41 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
         {/* Form: scrollable fields + sticky submit footer */}
         <form
           onSubmit={handleSubmit}
+          onPaste={handlePaste}
           style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}
         >
         {/* Scrollable fields */}
         <div className="p-6 space-y-6 overflow-y-auto" style={{ flex: 1 }}>
+          {restoredDraft && (
+            <div
+              className="rounded-2xl border px-4 py-3 flex items-start justify-between gap-3"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.75)',
+                borderColor: 'var(--color-sand-200)',
+              }}
+            >
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                  Letzten Entwurf wiederhergestellt
+                </p>
+                <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                  Text und Metadaten wurden aus dem letzten ungespeicherten Entwurf geladen.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem(CREATE_DRAFT_STORAGE_KEY);
+                  setRestoredDraft(false);
+                }}
+                className="text-xs font-semibold"
+                style={{ color: 'var(--color-terracotta-600)' }}
+              >
+                Verwerfen
+              </button>
+            </div>
+          )}
+
           {/* Photo Upload */}
           <div>
             <label
@@ -337,7 +479,7 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isSubmitting || photos.length >= 10}
+              disabled={isSubmitting || photos.length >= MAX_PHOTOS_PER_MEMORY}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed text-sm font-semibold transition-all duration-200 hover:border-terracotta-400"
               style={{
                 borderColor: 'var(--color-sand-300)',
@@ -348,15 +490,56 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
               <ImagePlus className="w-4 h-4" />
               {photos.length === 0
                 ? 'Fotos hinzufügen'
-                : photos.length < 10
+                : photos.length < MAX_PHOTOS_PER_MEMORY
                   ? `${photos.length} Foto${photos.length > 1 ? 's' : ''} · Weitere hinzufügen`
-                  : '10/10 Fotos'}
+                  : `${MAX_PHOTOS_PER_MEMORY}/${MAX_PHOTOS_PER_MEMORY} Fotos`}
             </button>
             {photos.length === 0 && (
               <p className="text-xs mt-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                Mehrere Fotos gleichzeitig auswählbar (max. 10)
+                Mehrere Fotos gleichzeitig auswählbar (max. {MAX_PHOTOS_PER_MEMORY})
               </p>
             )}
+
+            <div
+              ref={pasteZoneRef}
+              tabIndex={0}
+              onClick={() => pasteZoneRef.current?.focus()}
+              onPaste={handlePaste}
+              onDrop={handleDrop}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsPasteTargetActive(true);
+              }}
+              onDragEnter={() => setIsPasteTargetActive(true)}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                  setIsPasteTargetActive(false);
+                }
+              }}
+              className="mt-3 rounded-2xl border text-sm transition-all duration-200 outline-none"
+              style={{
+                borderColor: isPasteTargetActive ? 'var(--color-terracotta-400)' : 'var(--color-sand-200)',
+                backgroundColor: isPasteTargetActive ? 'rgba(232,107,63,0.08)' : 'rgba(255,255,255,0.7)',
+                boxShadow: isPasteTargetActive ? '0 0 0 4px rgba(232,107,63,0.08)' : 'none',
+              }}
+            >
+              <div className="flex items-start gap-3 px-4 py-3">
+                <div
+                  className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: 'rgba(232,107,63,0.12)', color: 'var(--color-terracotta-600)' }}
+                >
+                  <ClipboardPaste className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                    Fotos hier einfuegen oder ablegen
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+                    Bild in WhatsApp oder Signal kopieren, dann hier tippen und einfuegen. Auf Desktop funktioniert auch Drag-and-Drop.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Audio Upload */}

@@ -8,7 +8,7 @@ import {
   Sparkles, SlidersHorizontal, Camera, Settings, HelpCircle,
   Type, Contrast, Link2, Map, List, Clock, AudioLines, Share2
 } from 'lucide-react';
-import type { Memory } from '../types';
+import type { Memory, CreateMemoryPayload } from '../types';
 import { FAMILY_MEMBERS, LOCATIONS } from '../types';
 import { CreateMemoryModal } from './CreateMemoryModal';
 import { MapView } from './MapView';
@@ -17,21 +17,15 @@ import { AudioPlayer } from './AudioPlayer';
 
 interface HomeScreenProps {
   memories: Memory[];
+  shareImportMessage?: string | null;
+  onClearShareImportMessage?: () => void;
   onUpdate?: (id: number, text: string) => Promise<void>;
   onUpdateDate?: (id: number, date: string) => Promise<void>;
+  onUpdateLocation?: (id: number, location: string | null) => Promise<void>;
   onUpdatePerson?: (id: number, childName: string | null) => Promise<void>;
   onDelete?: (id: number) => Promise<void>;
   onToggleFavorite?: (id: number) => Promise<void>;
-  onCreate?: (data: {
-    text: string;
-    child_name?: string;
-    location?: string;
-    source_date?: string;
-    people?: string[];
-    photos?: File[];
-    latitude?: number;
-    longitude?: number;
-  }) => Promise<Memory>;
+  onCreate?: (data: CreateMemoryPayload) => Promise<Memory>;
   onDeletePhoto?: (memoryId: number, photoId: number) => Promise<void>;
   onUpdatePhotoPeople?: (memoryId: number, photoId: number, people: string[]) => Promise<void>;
   onDeleteAudio?: (memoryId: number, audioId: number) => Promise<void>;
@@ -74,6 +68,8 @@ function getMemberColor(name: string | null) {
 }
 
 type FontSize = 'normal' | 'large' | 'xlarge';
+type InboxFilter = 'all' | 'missingText' | 'missingPerson' | 'missingLocation' | 'missingSpeaker';
+type InboxSort = 'priority' | 'recent' | 'oldest';
 
 const FONT_SIZE_CLASSES: Record<FontSize, string> = {
   normal: '',
@@ -81,7 +77,9 @@ const FONT_SIZE_CLASSES: Record<FontSize, string> = {
   xlarge: 'font-xlarge',
 };
 
-export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, onDelete, onToggleFavorite, onCreate, onDeletePhoto, onUpdatePhotoPeople, onDeleteAudio, onUpdateAudioSpeaker, onShare, identity, onIdentityReset }: HomeScreenProps) {
+const QUICK_SPEAKER_OPTIONS = [...FAMILY_MEMBERS.map(m => m.name), 'Mehrere'];
+
+export function HomeScreen({ memories, shareImportMessage, onClearShareImportMessage, onUpdate, onUpdateDate, onUpdateLocation, onUpdatePerson, onDelete, onToggleFavorite, onCreate, onDeletePhoto, onUpdatePhotoPeople, onDeleteAudio, onUpdateAudioSpeaker, onShare, identity, onIdentityReset }: HomeScreenProps) {
   const [personFilter, setPersonFilter] = useState<string>('Alle');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('7d');
   const [locationFilter, setLocationFilter] = useState<string>('Alle');
@@ -103,6 +101,9 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
   const [visibleImages, setVisibleImages] = useState(24);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [visibleEntries, setVisibleEntries] = useState(20);
+  const [inboxFilter, setInboxFilter] = useState<InboxFilter>('all');
+  const [inboxSort, setInboxSort] = useState<InboxSort>('priority');
+  const [quickActionKey, setQuickActionKey] = useState<string | null>(null);
   const textScrollRef = useRef<HTMLDivElement>(null);
   const textSentinelRef = useRef<HTMLDivElement>(null);
   const photoSentinelRef = useRef<HTMLDivElement>(null);
@@ -251,6 +252,62 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
     setEditText('');
   };
 
+  const getMissingFields = (memory: Memory) => {
+    const missingText = !memory.cleaned_summary || memory.cleaned_summary.trim().length === 0;
+    const missingPerson = !memory.child_name;
+    const missingLocation = !memory.location;
+    const missingSpeaker = memory.audios.some(audio => !audio.voice_speaker);
+
+    return {
+      missingText,
+      missingPerson,
+      missingLocation,
+      missingSpeaker,
+    };
+  };
+
+  const handleQuickSetPerson = async (memory: Memory, person: string) => {
+    if (!onUpdatePerson) return;
+    const actionKey = `${memory.id}:person:${person}`;
+    setQuickActionKey(actionKey);
+    try {
+      await onUpdatePerson(memory.id, person);
+    } catch (error) {
+      console.error('Fehler beim schnellen Setzen der Person:', error);
+    } finally {
+      setQuickActionKey(null);
+    }
+  };
+
+  const handleQuickSetLocation = async (memory: Memory, location: string) => {
+    if (!onUpdateLocation) return;
+    const actionKey = `${memory.id}:location:${location}`;
+    setQuickActionKey(actionKey);
+    try {
+      await onUpdateLocation(memory.id, location);
+    } catch (error) {
+      console.error('Fehler beim schnellen Ergänzen des Orts:', error);
+    } finally {
+      setQuickActionKey(null);
+    }
+  };
+
+  const handleQuickSetSpeaker = async (memory: Memory, speaker: string) => {
+    if (!onUpdateAudioSpeaker) return;
+    const actionKey = `${memory.id}:speaker:${speaker}`;
+    setQuickActionKey(actionKey);
+    try {
+      const missingAudios = memory.audios.filter(audio => !audio.voice_speaker);
+      for (const audio of missingAudios) {
+        await onUpdateAudioSpeaker(memory.id, audio.id, speaker);
+      }
+    } catch (error) {
+      console.error('Fehler beim schnellen Setzen des Sprechers:', error);
+    } finally {
+      setQuickActionKey(null);
+    }
+  };
+
   const handleLightboxSave = async () => {
     if (!onUpdate || !lightboxImage || lightboxEditText.trim() === '') return;
     setLightboxIsSaving(true);
@@ -276,6 +333,42 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const getInboxPriority = (memory: Memory) => {
+    const missing = getMissingFields(memory);
+    let score = 0;
+    if (missing.missingText) score += 5;
+    if (missing.missingSpeaker) score += 4;
+    if (missing.missingPerson) score += 3;
+    if (missing.missingLocation) score += 2;
+    if (memory.photos.length >= 10) score += 2;
+    if (memory.audios.length >= 2) score += 1;
+
+    const ageInDays = Math.floor((Date.now() - new Date(memory.created_at).getTime()) / (1000 * 60 * 60 * 24));
+    if (ageInDays >= 14) score += 3;
+    else if (ageInDays >= 7) score += 2;
+    else if (ageInDays >= 2) score += 1;
+
+    const label = score >= 10 ? 'Hoch' : score >= 6 ? 'Mittel' : 'Leicht';
+    return { score, label, ageInDays };
+  };
+
+  const getInboxCompletion = (memory: Memory) => {
+    const missing = getMissingFields(memory);
+    const missingCount = [
+      missing.missingText,
+      missing.missingPerson,
+      missing.missingLocation,
+      missing.missingSpeaker,
+    ].filter(Boolean).length;
+    const totalChecks = 4;
+    const completedCount = totalChecks - missingCount;
+    return {
+      completedCount,
+      missingCount,
+      percent: Math.round((completedCount / totalChecks) * 100),
+    };
   };
 
   const timeRange = useMemo(() =>
@@ -353,6 +446,66 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
       .filter(m => m.cleaned_summary && m.cleaned_summary.length > 0)
       .sort((a, b) => new Date(b.source_date).getTime() - new Date(a.source_date).getTime());
   }, [filteredMemories]);
+
+  const inboxEntries = useMemo(() => {
+    return filteredMemories
+      .filter(m => {
+        const hasMedia = m.photos.length > 0 || m.audios.length > 0;
+        if (!hasMedia) return false;
+
+        const missing = getMissingFields(m);
+        switch (inboxFilter) {
+          case 'missingText':
+            return missing.missingText;
+          case 'missingPerson':
+            return missing.missingPerson;
+          case 'missingLocation':
+            return missing.missingLocation;
+          case 'missingSpeaker':
+            return missing.missingSpeaker;
+          case 'all':
+          default:
+            return missing.missingText || missing.missingPerson || missing.missingLocation || missing.missingSpeaker;
+        }
+      })
+      .sort((a, b) => {
+        if (inboxSort === 'recent') {
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+        if (inboxSort === 'oldest') {
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+
+        const priorityDiff = getInboxPriority(b).score - getInboxPriority(a).score;
+        if (priorityDiff !== 0) return priorityDiff;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+  }, [filteredMemories, inboxFilter, inboxSort]);
+
+  const mediaMemories = useMemo(() =>
+    filteredMemories.filter(memory => memory.photos.length > 0 || memory.audios.length > 0),
+  [filteredMemories]);
+
+  const inboxOverview = useMemo(() => {
+    const openEntries = mediaMemories.filter(memory => {
+      const missing = getMissingFields(memory);
+      return missing.missingText || missing.missingPerson || missing.missingLocation || missing.missingSpeaker;
+    });
+    const openTasks = openEntries.reduce((sum, memory) => sum + getInboxCompletion(memory).missingCount, 0);
+    const almostDone = openEntries.filter(memory => getInboxCompletion(memory).missingCount === 1).length;
+    const completed = mediaMemories.length - openEntries.length;
+    const completionPercent = mediaMemories.length === 0 ? 100 : Math.round((completed / mediaMemories.length) * 100);
+    const nextRecommended = [...openEntries].sort((a, b) => getInboxPriority(b).score - getInboxPriority(a).score)[0] ?? null;
+
+    return {
+      openEntries,
+      openTasks,
+      almostDone,
+      completed,
+      completionPercent,
+      nextRecommended,
+    };
+  }, [mediaMemories]);
 
   // All memories with photos — no time filter, sorted newest first
   const memoryPhotoGroups = useMemo(() => {
@@ -667,6 +820,34 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
 
         {/* Compact Filter Bar */}
         <div className="mb-6">
+          {shareImportMessage && (
+            <div
+              className="mb-4 rounded-2xl border px-4 py-3 flex items-start justify-between gap-3"
+              style={{
+                background: 'linear-gradient(135deg, rgba(117,143,90,0.12) 0%, rgba(255,255,255,0.8) 100%)',
+                borderColor: 'rgba(117,143,90,0.2)',
+              }}
+            >
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                  Import abgeschlossen
+                </p>
+                <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                  {shareImportMessage}
+                </p>
+              </div>
+              {onClearShareImportMessage && (
+                <button
+                  onClick={onClearShareImportMessage}
+                  className="p-2 rounded-xl transition-all hover:bg-white/60"
+                  aria-label="Hinweis schließen"
+                >
+                  <X className="w-4 h-4" style={{ color: 'var(--color-text-muted)' }} />
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-2 flex-wrap">
             {/* Search */}
             <div className="flex-1 min-w-[120px] sm:min-w-44 relative">
@@ -882,6 +1063,442 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
         </div>
 
         <div className="flex flex-col">
+
+        {/* Inbox Section */}
+        {inboxOverview.openEntries.length > 0 && (
+          <div className="mb-6" style={{ order: 1 }}>
+            <div className="glass-card overflow-hidden">
+              <div
+                className="px-5 py-4 flex items-center gap-3"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(117,143,90,0.08) 0%, rgba(232,107,63,0.06) 100%)',
+                  borderBottom: '1px solid rgba(255,255,255,0.5)',
+                }}
+              >
+                <div
+                  className="p-2 rounded-xl"
+                  style={{ backgroundColor: 'rgba(117,143,90,0.12)' }}
+                >
+                  <Clock className="w-5 h-5" style={{ color: 'var(--color-sage-600)' }} />
+                </div>
+                <div>
+                  <h2
+                    className="text-lg font-bold"
+                    style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-display)' }}
+                  >
+                    Später ergänzen
+                  </h2>
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    {inboxEntries.length} {inboxEntries.length === 1 ? 'Eintrag wartet' : 'Einträge warten'} auf Beschreibung
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-4 pt-4 grid gap-3 sm:grid-cols-4">
+                <div className="rounded-2xl border px-4 py-3" style={{ borderColor: 'var(--color-sand-200)', backgroundColor: 'rgba(255,255,255,0.62)' }}>
+                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                    Offen
+                  </p>
+                  <p className="text-2xl font-bold mt-1" style={{ color: 'var(--color-text-primary)' }}>
+                    {inboxOverview.openEntries.length}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    Medien-Erinnerungen warten auf Nachpflege
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border px-4 py-3" style={{ borderColor: 'var(--color-sand-200)', backgroundColor: 'rgba(255,255,255,0.62)' }}>
+                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                    Aufgaben
+                  </p>
+                  <p className="text-2xl font-bold mt-1" style={{ color: 'var(--color-text-primary)' }}>
+                    {inboxOverview.openTasks}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    Fehlende Angaben insgesamt
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border px-4 py-3" style={{ borderColor: 'var(--color-sand-200)', backgroundColor: 'rgba(255,255,255,0.62)' }}>
+                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                    Fast fertig
+                  </p>
+                  <p className="text-2xl font-bold mt-1" style={{ color: 'var(--color-text-primary)' }}>
+                    {inboxOverview.almostDone}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    Nur noch ein Schritt offen
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border px-4 py-3" style={{ borderColor: 'rgba(117,143,90,0.18)', background: 'linear-gradient(135deg, rgba(117,143,90,0.12) 0%, rgba(255,255,255,0.8) 100%)' }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                        Fortschritt
+                      </p>
+                      <p className="text-2xl font-bold mt-1" style={{ color: 'var(--color-text-primary)' }}>
+                        {inboxOverview.completionPercent}%
+                      </p>
+                    </div>
+                    <Sparkles className="w-5 h-5" style={{ color: 'var(--color-sage-600)' }} />
+                  </div>
+                  <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(146,122,94,0.15)' }}>
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${inboxOverview.completionPercent}%`,
+                        background: 'linear-gradient(90deg, var(--color-sage-500) 0%, var(--color-terracotta-500) 100%)',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {inboxOverview.nextRecommended && (
+                <div className="px-4 pt-4">
+                  <div
+                    className="rounded-2xl border px-4 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+                    style={{ borderColor: 'rgba(232,107,63,0.18)', background: 'linear-gradient(135deg, rgba(232,107,63,0.10) 0%, rgba(255,255,255,0.78) 100%)' }}
+                  >
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                        Nächster Fokus
+                      </p>
+                      <p className="text-sm font-semibold mt-1" style={{ color: 'var(--color-text-primary)' }}>
+                        {format(parseISO(inboxOverview.nextRecommended.source_date), 'd. MMM yyyy', { locale: de })} · {getInboxPriority(inboxOverview.nextRecommended).label}
+                      </p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                        {getInboxCompletion(inboxOverview.nextRecommended).missingCount} Angaben fehlen noch. Dieser Eintrag bringt euch gerade am meisten voran.
+                      </p>
+                    </div>
+                    {onUpdate && (
+                      <button
+                        onClick={() => handleStartEdit(inboxOverview.nextRecommended!)}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
+                        style={{
+                          background: 'linear-gradient(135deg, var(--color-terracotta-500) 0%, var(--color-terracotta-600) 100%)',
+                          color: 'white',
+                        }}
+                      >
+                        <Pencil className="w-4 h-4" />
+                        Jetzt vervollständigen
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="px-4 pt-4 flex flex-wrap items-center gap-2">
+                {[
+                  { value: 'all', label: 'Alles offen' },
+                  { value: 'missingText', label: 'Ohne Text' },
+                  { value: 'missingPerson', label: 'Ohne Person' },
+                  { value: 'missingLocation', label: 'Ohne Ort' },
+                  { value: 'missingSpeaker', label: 'Ohne Sprecher' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setInboxFilter(option.value as InboxFilter)}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                    style={{
+                      backgroundColor: inboxFilter === option.value ? 'var(--color-sage-500)' : 'white',
+                      color: inboxFilter === option.value ? 'white' : 'var(--color-text-muted)',
+                      border: inboxFilter === option.value ? 'none' : '1px solid var(--color-sand-200)',
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+
+                <div className="ml-auto flex flex-wrap gap-2">
+                  {[
+                    { value: 'priority', label: 'Nach Priorität' },
+                    { value: 'recent', label: 'Neueste zuerst' },
+                    { value: 'oldest', label: 'Älteste zuerst' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setInboxSort(option.value as InboxSort)}
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                      style={{
+                        backgroundColor: inboxSort === option.value ? 'var(--color-terracotta-500)' : 'white',
+                        color: inboxSort === option.value ? 'white' : 'var(--color-text-muted)',
+                        border: inboxSort === option.value ? 'none' : '1px solid var(--color-sand-200)',
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-4 space-y-3">
+                {inboxEntries.length === 0 ? (
+                  <div className="rounded-2xl border px-4 py-8 text-center" style={{ borderColor: 'var(--color-sand-200)', backgroundColor: 'rgba(255,255,255,0.45)' }}>
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                      Nichts mehr offen
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                      Für diesen Filter gibt es aktuell keine offenen Ergänzungen.
+                    </p>
+                  </div>
+                ) : inboxEntries.map((memory) => {
+                  const missing = getMissingFields(memory);
+                  const priority = getInboxPriority(memory);
+                  const completion = getInboxCompletion(memory);
+                  const missingBadges = [
+                    missing.missingText ? 'Text fehlt' : null,
+                    missing.missingPerson ? 'Person fehlt' : null,
+                    missing.missingLocation ? 'Ort fehlt' : null,
+                    missing.missingSpeaker ? 'Sprecher fehlt' : null,
+                  ].filter(Boolean);
+
+                  return (
+                  <div
+                    key={memory.id}
+                    className="rounded-2xl border p-4 transition-all duration-200 hover:bg-white/50"
+                    style={{ borderColor: 'var(--color-sand-200)', backgroundColor: 'rgba(255,255,255,0.45)' }}
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className="px-2.5 py-1 rounded-full text-xs font-bold"
+                        style={{ backgroundColor: 'var(--color-sage-500)', color: 'white' }}
+                      >
+                        Inbox
+                      </span>
+                      <span className="text-xs flex items-center gap-1" style={{ color: 'var(--color-text-light)' }}>
+                        <Calendar className="w-3 h-3" />
+                        {format(parseISO(memory.source_date), 'd. MMM yyyy', { locale: de })}
+                      </span>
+                      {memory.photos.length > 0 && (
+                        <span className="text-xs flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                          <Camera className="w-3 h-3" />
+                          {memory.photos.length} Foto{memory.photos.length > 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {memory.audios.length > 0 && (
+                        <span className="text-xs flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                          <AudioLines className="w-3 h-3" />
+                          {memory.audios.length} Audio
+                        </span>
+                      )}
+                      <span
+                        className="px-2.5 py-1 rounded-full text-xs font-semibold"
+                        style={{
+                          backgroundColor: priority.label === 'Hoch' ? 'rgba(220,38,38,0.1)' : priority.label === 'Mittel' ? 'rgba(232,107,63,0.1)' : 'rgba(117,143,90,0.12)',
+                          color: priority.label === 'Hoch' ? '#b91c1c' : priority.label === 'Mittel' ? 'var(--color-terracotta-600)' : 'var(--color-sage-700)',
+                        }}
+                      >
+                        Priorität: {priority.label}
+                      </span>
+                      <span className="text-xs ml-auto" style={{ color: 'var(--color-text-muted)' }}>
+                        von {memory.recorded_by || 'Familie'}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-3 flex-wrap">
+                      <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                        {priority.ageInDays === 0 ? 'Heute erstellt' : `Seit ${priority.ageInDays} Tag${priority.ageInDays === 1 ? '' : 'en'} offen`}
+                      </span>
+                      <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                        {completion.completedCount}/4 Angaben fertig
+                      </span>
+                      <div className="h-1.5 w-24 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(146,122,94,0.15)' }}>
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${completion.percent}%`,
+                            background: 'linear-gradient(90deg, var(--color-sage-500) 0%, var(--color-terracotta-500) 100%)',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {missingBadges.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {missingBadges.map((badge) => (
+                          <span
+                            key={badge}
+                            className="px-2.5 py-1 rounded-full text-xs font-semibold"
+                            style={{ backgroundColor: 'rgba(232,107,63,0.1)', color: 'var(--color-terracotta-600)' }}
+                          >
+                            {badge}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {editingId === memory.id ? (
+                      <div className="mt-3 animate-fade-in">
+                        <textarea
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          className="w-full p-3 rounded-xl text-sm leading-relaxed resize-none border-2 focus:outline-none transition-all duration-200"
+                          style={{
+                            backgroundColor: 'white',
+                            borderColor: 'var(--color-sage-300)',
+                            color: 'var(--color-text-secondary)',
+                            boxShadow: '0 0 0 4px rgba(117,143,90,0.08)',
+                          }}
+                          rows={3}
+                          autoFocus
+                          disabled={isSaving}
+                          placeholder="Kurz beschreiben, was hier passiert ist..."
+                        />
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={handleSaveEdit}
+                            disabled={isSaving || editText.trim() === ''}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all disabled:opacity-50"
+                            style={{ backgroundColor: 'var(--color-sage-500)' }}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            {isSaving ? '...' : 'Speichern'}
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            disabled={isSaving}
+                            className="px-3 py-1.5 rounded-xl text-xs font-medium"
+                            style={{ backgroundColor: 'white', color: 'var(--color-text-muted)' }}
+                          >
+                            Abbrechen
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm mt-3" style={{ color: 'var(--color-text-secondary)' }}>
+                        Medien sind schon gespeichert. Ergänze fehlende Angaben direkt mit einem Tipp.
+                      </p>
+                    )}
+
+                    {(memory.photos.length > 0 || memory.audios.length > 0) && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {memory.photos.slice(0, 3).map(photo => (
+                          <img
+                            key={photo.id}
+                            src={photo.url}
+                            alt=""
+                            className="w-14 h-14 rounded-xl object-cover"
+                          />
+                        ))}
+                        {memory.photos.length > 3 && (
+                          <div
+                            className="w-14 h-14 rounded-xl flex items-center justify-center text-xs font-semibold"
+                            style={{ backgroundColor: 'var(--color-sand-100)', color: 'var(--color-text-muted)' }}
+                          >
+                            +{memory.photos.length - 3}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {missing.missingPerson && onUpdatePerson && (
+                      <div className="mt-4">
+                        <p className="text-xs font-semibold mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                          Wer war dabei?
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {FAMILY_MEMBERS.map(member => {
+                            const actionId = `${memory.id}:person:${member.name}`;
+                            const active = quickActionKey === actionId;
+                            return (
+                              <button
+                                key={member.name}
+                                onClick={() => handleQuickSetPerson(memory, member.name)}
+                                disabled={Boolean(quickActionKey)}
+                                className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-60"
+                                style={{
+                                  backgroundColor: member.color.bg,
+                                  color: member.color.text,
+                                  border: `1px solid ${member.color.activeBg}22`,
+                                }}
+                              >
+                                {active ? '...' : member.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {missing.missingLocation && onUpdateLocation && (
+                      <div className="mt-4">
+                        <p className="text-xs font-semibold mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                          Ort schnell setzen
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {LOCATIONS.map(loc => {
+                            const actionId = `${memory.id}:location:${loc.name}`;
+                            const active = quickActionKey === actionId;
+                            return (
+                              <button
+                                key={loc.name}
+                                onClick={() => handleQuickSetLocation(memory, loc.name)}
+                                disabled={Boolean(quickActionKey)}
+                                className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-60"
+                                style={{
+                                  backgroundColor: 'var(--color-sand-100)',
+                                  color: 'var(--color-text-primary)',
+                                  border: '1px solid var(--color-sand-200)',
+                                }}
+                              >
+                                {active ? '...' : `${loc.emoji} ${loc.name}`}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {missing.missingSpeaker && onUpdateAudioSpeaker && (
+                      <div className="mt-4">
+                        <p className="text-xs font-semibold mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                          Wessen Stimme ist zu hören?
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {QUICK_SPEAKER_OPTIONS.map(speaker => {
+                            const actionId = `${memory.id}:speaker:${speaker}`;
+                            const active = quickActionKey === actionId;
+                            return (
+                              <button
+                                key={speaker}
+                                onClick={() => handleQuickSetSpeaker(memory, speaker)}
+                                disabled={Boolean(quickActionKey)}
+                                className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-60"
+                                style={{
+                                  backgroundColor: 'white',
+                                  color: 'var(--color-text-primary)',
+                                  border: '1px solid var(--color-sand-200)',
+                                }}
+                              >
+                                {active ? '...' : speaker}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {onUpdate && editingId !== memory.id && (
+                      <button
+                        onClick={() => handleStartEdit(memory)}
+                        className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
+                        style={{
+                          background: 'linear-gradient(135deg, var(--color-sage-500) 0%, var(--color-sage-600) 100%)',
+                          color: 'white',
+                        }}
+                      >
+                        <Pencil className="w-4 h-4" />
+                        Text ergänzen
+                      </button>
+                    )}
+                  </div>
+                )})}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Aktuelles Section */}
         <div className="mb-12" style={{ order: 2 }}>

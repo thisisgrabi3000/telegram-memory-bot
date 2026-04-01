@@ -71,6 +71,13 @@ export const updateDateSchema = z.object({
 });
 
 /**
+ * Schema für PATCH /memories/:id/location
+ */
+export const updateLocationSchema = z.object({
+  location: z.string().max(200).nullable(),
+});
+
+/**
  * Schema für PATCH /memories/:id/person
  */
 export const updatePersonSchema = z.object({
