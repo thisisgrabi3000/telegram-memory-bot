@@ -138,6 +138,27 @@ export const photoParamSchema = z.object({
 });
 
 /**
+ * Schema für Memory-ID + Audio-ID Parameter
+ */
+export const audioParamSchema = z.object({
+  id: z
+    .string()
+    .transform(val => parseInt(val, 10))
+    .refine(val => !isNaN(val) && val > 0, 'Ungültige ID'),
+  audioId: z
+    .string()
+    .transform(val => parseInt(val, 10))
+    .refine(val => !isNaN(val) && val > 0, 'Ungültige Audio-ID'),
+});
+
+/**
+ * Schema für PATCH /memories/:id/audios/:audioId/speaker
+ */
+export const updateSpeakerSchema = z.object({
+  voice_speaker: z.string().max(MAX_NAME_LENGTH).optional().nullable(),
+});
+
+/**
  * Middleware-Factory für Body-Validierung
  */
 export function validateBody<T extends z.ZodSchema>(schema: T) {

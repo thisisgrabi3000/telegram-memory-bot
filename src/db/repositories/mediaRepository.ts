@@ -104,4 +104,14 @@ export const mediaRepository = {
     const rows = stmt.all(speaker) as Array<{ memory_entry_id: number }>;
     return rows.map(r => r.memory_entry_id);
   },
+
+  /**
+   * Aktualisiert den Sprecher einer Audio-Aufnahme
+   */
+  updateSpeaker(id: number, speaker: string | null): boolean {
+    const db = getDatabase();
+    const stmt = db.prepare('UPDATE media_attachments SET voice_speaker = ? WHERE id = ?');
+    const result = stmt.run(speaker, id);
+    return result.changes > 0;
+  },
 };

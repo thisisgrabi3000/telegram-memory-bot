@@ -15,7 +15,9 @@ import {
   memoriesQuerySchema,
   idParamSchema,
   photoParamSchema,
+  audioParamSchema,
   audioAttachSchema,
+  updateSpeakerSchema,
   validateBody,
   validateQuery,
   validateParams,
@@ -614,6 +616,77 @@ router.delete('/memories/:id/photos/:photoId', writeLimiter, validateParams(phot
   } catch (error) {
     console.error('API Error:', error);
     res.status(500).json({ success: false, error: 'Fehler beim Löschen des Fotos' });
+  }
+});
+
+/**
+ * DELETE /api/memories/:id/audios/:audioId
+ * Löscht eine einzelne Audio-Aufnahme aus einer Erinnerung
+ */
+router.delete('/memories/:id/audios/:audioId', writeLimiter, validateParams(audioParamSchema), (req, res) => {
+  try {
+    const { id, audioId } = req.params as unknown as { id: number; audioId: number };
+
+    const memory = memoryRepository.findById(id);
+    if (!memory) {
+      return res.status(404).json({ success: false, error: 'Erinnerung nicht gefunden' });
+    }
+
+    const attachment = mediaRepository.findById(audioId);
+    if (!attachment || attachment.memory_entry_id !== id || attachment.media_type !== 'audio') {
+      return res.status(404).json({ success: false, error: 'Aufnahme nicht gefunden' });
+    }
+
+    // Datei von Disk löschen
+    if (attachment.local_path) {
+      const filePath = path.resolve('./uploads', attachment.local_path);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    mediaRepository.deleteById(audioId);
+
+    const attachments = mediaRepository.findByMemoryId(id);
+    res.json({
+      success: true,
+      data: transformMemory(memory, attachments),
+    });
+  } catch (error) {
+    console.error('API Error:', error);
+    res.status(500).json({ success: false, error: 'Fehler beim Löschen der Aufnahme' });
+  }
+});
+
+/**
+ * PATCH /api/memories/:id/audios/:audioId/speaker
+ * Ändert den Sprecher einer Audio-Aufnahme
+ */
+router.patch('/memories/:id/audios/:audioId/speaker', writeLimiter, validateParams(audioParamSchema), validateBody(updateSpeakerSchema), (req, res) => {
+  try {
+    const { id, audioId } = req.params as unknown as { id: number; audioId: number };
+    const { voice_speaker } = req.body as { voice_speaker: string | null };
+
+    const memory = memoryRepository.findById(id);
+    if (!memory) {
+      return res.status(404).json({ success: false, error: 'Erinnerung nicht gefunden' });
+    }
+
+    const attachment = mediaRepository.findById(audioId);
+    if (!attachment || attachment.memory_entry_id !== id || attachment.media_type !== 'audio') {
+      return res.status(404).json({ success: false, error: 'Aufnahme nicht gefunden' });
+    }
+
+    mediaRepository.updateSpeaker(audioId, voice_speaker);
+
+    const attachments = mediaRepository.findByMemoryId(id);
+    res.json({
+      success: true,
+      data: transformMemory(memory, attachments),
+    });
+  } catch (error) {
+    console.error('API Error:', error);
+    res.status(500).json({ success: false, error: 'Fehler beim Aktualisieren des Sprechers' });
   }
 });
 
