@@ -7,6 +7,7 @@ import * as performanceIndexes from './migrations/004_add_performance_indexes';
 import * as addPeopleField from './migrations/005_add_people_field';
 import * as addCoordinates from './migrations/006_add_coordinates';
 import * as addVoiceSpeaker from './migrations/007_add_voice_speaker';
+import * as addShareTokens from './migrations/008_add_share_tokens';
 
 /**
  * Führt alle ausstehenden Migrationen aus.
@@ -31,6 +32,7 @@ function runMigrations(): void {
     { name: '005_add_people_field', migration: addPeopleField },
     { name: '006_add_coordinates', migration: addCoordinates },
     { name: '007_add_voice_speaker', migration: addVoiceSpeaker },
+    { name: '008_add_share_tokens', migration: addShareTokens },
   ];
 
   for (const { name, migration } of migrations) {
