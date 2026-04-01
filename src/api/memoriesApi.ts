@@ -735,7 +735,7 @@ router.get('/locations', (_req, res) => {
 /**
  * Transformiert einen Datenbank-Eintrag in ein API-freundliches Format
  */
-function transformMemory(entry: MemoryEntry, attachments: MediaAttachment[]) {
+export function transformMemory(entry: MemoryEntry, attachments: MediaAttachment[]) {
   return {
     id: entry.id,
     created_at: entry.created_at,
