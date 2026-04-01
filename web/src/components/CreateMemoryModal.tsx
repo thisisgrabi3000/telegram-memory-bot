@@ -39,6 +39,7 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
   const [exifHint, setExifHint] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pasteZoneRef = useRef<HTMLDivElement>(null);
+  const pasteEditableRef = useRef<HTMLDivElement>(null);
   const photoObjectUrlsRef = useRef<string[]>([]);
   const [isPasteTargetActive, setIsPasteTargetActive] = useState(false);
   const [restoredDraft, setRestoredDraft] = useState(false);
@@ -242,6 +243,9 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
     if (files.length === 0) return;
 
     event.preventDefault();
+    if (pasteEditableRef.current) {
+      pasteEditableRef.current.textContent = '';
+    }
     await processIncomingPhotos(files, 'paste');
   }
 
@@ -503,7 +507,7 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
             <div
               ref={pasteZoneRef}
               tabIndex={0}
-              onClick={() => pasteZoneRef.current?.focus()}
+              onClick={() => pasteEditableRef.current?.focus()}
               onPaste={handlePaste}
               onDrop={handleDrop}
               onDragOver={(e) => {
@@ -535,9 +539,36 @@ export function CreateMemoryModal({ onClose, onCreate }: CreateMemoryModalProps)
                     Fotos hier einfuegen oder ablegen
                   </p>
                   <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
-                    Bild in WhatsApp oder Signal kopieren, dann hier tippen und einfuegen. Auf Desktop funktioniert auch Drag-and-Drop.
+                    iPhone: im Feld unten lange druecken und "Einfuegen" waehlen. Auf Desktop funktioniert auch Drag-and-Drop.
                   </p>
                 </div>
+              </div>
+
+              <div className="px-4 pb-4">
+                <div
+                  ref={pasteEditableRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  role="textbox"
+                  aria-label="Bild hier einfuegen"
+                  onPaste={handlePaste}
+                  onInput={(e) => {
+                    e.currentTarget.textContent = '';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.textContent = '';
+                  }}
+                  className="w-full rounded-2xl border px-3 py-3 text-sm"
+                  style={{
+                    minHeight: '52px',
+                    borderColor: 'var(--color-sand-200)',
+                    backgroundColor: 'white',
+                    color: 'var(--color-text-primary)',
+                    WebkitUserSelect: 'text',
+                    userSelect: 'text',
+                  }}
+                  data-placeholder="Hier lange druecken und Bild einfuegen"
+                />
               </div>
             </div>
           </div>

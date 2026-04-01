@@ -1244,3 +1244,12 @@ html, body {
     padding-right: 0.75rem;
   }
 }
+[contenteditable][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-light);
+  pointer-events: none;
+}
+
+[contenteditable][data-placeholder]:focus::before {
+  content: attr(data-placeholder);
+}
