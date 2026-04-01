@@ -159,6 +159,13 @@ export const updateSpeakerSchema = z.object({
 });
 
 /**
+ * Schema für PATCH /memories/:id/photos/:photoId/people
+ */
+export const updatePhotoPeopleSchema = z.object({
+  people: z.array(z.string().max(MAX_NAME_LENGTH)).max(20),
+});
+
+/**
  * Middleware-Factory für Body-Validierung
  */
 export function validateBody<T extends z.ZodSchema>(schema: T) {

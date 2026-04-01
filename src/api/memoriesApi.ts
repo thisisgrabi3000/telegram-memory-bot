@@ -18,6 +18,7 @@ import {
   audioParamSchema,
   audioAttachSchema,
   updateSpeakerSchema,
+  updatePhotoPeopleSchema,
   validateBody,
   validateQuery,
   validateParams,
@@ -620,6 +621,35 @@ router.delete('/memories/:id/photos/:photoId', writeLimiter, validateParams(phot
 });
 
 /**
+ * PATCH /api/memories/:id/photos/:photoId/people
+ * Aktualisiert die Personen-Tags eines Fotos
+ */
+router.patch('/memories/:id/photos/:photoId/people', writeLimiter, validateParams(photoParamSchema), validateBody(updatePhotoPeopleSchema), (req, res) => {
+  try {
+    const { id, photoId } = req.params as unknown as { id: number; photoId: number };
+    const { people } = req.body as { people: string[] };
+
+    const memory = memoryRepository.findById(id);
+    if (!memory) {
+      return res.status(404).json({ success: false, error: 'Erinnerung nicht gefunden' });
+    }
+
+    const attachment = mediaRepository.findById(photoId);
+    if (!attachment || attachment.media_type !== 'photo' || attachment.memory_entry_id !== id) {
+      return res.status(404).json({ success: false, error: 'Foto nicht gefunden' });
+    }
+
+    mediaRepository.updatePhotoPeople(photoId, people);
+
+    const attachments = mediaRepository.findByMemoryId(id);
+    res.json({ success: true, data: transformMemory(memory, attachments) });
+  } catch (error) {
+    console.error('PATCH photo people error:', error);
+    res.status(500).json({ success: false, error: 'Fehler beim Aktualisieren' });
+  }
+});
+
+/**
  * DELETE /api/memories/:id/audios/:audioId
  * Löscht eine einzelne Audio-Aufnahme aus einer Erinnerung
  */
@@ -757,6 +787,7 @@ export function transformMemory(entry: MemoryEntry, attachments: MediaAttachment
         id: a.id,
         url: `/uploads/${a.local_path}`,
         filename: a.local_path,
+        people: safeJsonParse<string[]>(a.photo_people, []),
       })),
     audios: attachments
       .filter(a => a.media_type === 'audio')
