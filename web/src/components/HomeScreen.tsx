@@ -199,44 +199,6 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
     return () => document.removeEventListener('keydown', handleKey);
   }, [lightboxImage, lightboxEditMode]);
 
-  // Reset visible count when filtered list changes (e.g. user changes a filter)
-  useEffect(() => {
-    setVisibleEntries(20);
-  }, [textEntries]);
-
-  // Auto-load more text entries as user scrolls to the bottom of the feed
-  useEffect(() => {
-    const root = textScrollRef.current;
-    const sentinel = textSentinelRef.current;
-    if (!root || !sentinel) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisibleEntries(prev => prev < textEntries.length ? prev + 20 : prev);
-        }
-      },
-      { root, threshold: 0 }
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [textEntries, visibleEntries]);
-
-  // Auto-load more photos as user scrolls to the sentinel below the grid
-  useEffect(() => {
-    const sentinel = photoSentinelRef.current;
-    if (!sentinel) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisibleImages(prev => prev < memoryPhotoGroups.length ? prev + 24 : prev);
-        }
-      },
-      { threshold: 0 }
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [memoryPhotoGroups.length]);
-
   // Accessibility handlers
   const handleFontSizeChange = (size: FontSize) => {
     setFontSize(size);
@@ -390,6 +352,44 @@ export function HomeScreen({ memories, onUpdate, onUpdateDate, onUpdatePerson, o
       .filter(m => m.photos && m.photos.length > 0)
       .sort((a, b) => new Date(b.source_date).getTime() - new Date(a.source_date).getTime());
   }, [memories]);
+
+  // Reset visible count when filtered list changes (e.g. user changes a filter)
+  useEffect(() => {
+    setVisibleEntries(20);
+  }, [textEntries]);
+
+  // Auto-load more text entries as user scrolls to the bottom of the feed
+  useEffect(() => {
+    const root = textScrollRef.current;
+    const sentinel = textSentinelRef.current;
+    if (!root || !sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleEntries(prev => prev < textEntries.length ? prev + 20 : prev);
+        }
+      },
+      { root, threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [textEntries, visibleEntries]);
+
+  // Auto-load more photos as user scrolls to the sentinel below the grid
+  useEffect(() => {
+    const sentinel = photoSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleImages(prev => prev < memoryPhotoGroups.length ? prev + 24 : prev);
+        }
+      },
+      { threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [memoryPhotoGroups.length]);
 
   const allPersons = ['Alle', ...FAMILY_MEMBERS.map(m => m.name)];
   const allLocations = ['Alle', ...LOCATIONS.map(l => l.name)];
