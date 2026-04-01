@@ -5,6 +5,7 @@ import { env } from '../config/env';
 declare module 'express-session' {
   interface SessionData {
     authenticated: boolean;
+    identity?: string | null;
   }
 }
 
@@ -72,7 +73,20 @@ router.get('/status', (req, res) => {
     success: true,
     passwordRequired: !!env.WEB_PASSWORD,
     authenticated: !!req.session.authenticated,
+    identity: req.session.identity ?? null,
   });
+});
+
+/**
+ * PATCH /api/auth/identity
+ * Saves or clears the identity in the current session
+ */
+router.patch('/identity', requireAuth, (req, res) => {
+  const { identity } = req.body as { identity?: string | null };
+  if (identity !== undefined) {
+    req.session.identity = identity || null;
+  }
+  res.json({ success: true });
 });
 
 export const authApi = router;
